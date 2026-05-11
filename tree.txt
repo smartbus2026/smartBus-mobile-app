@@ -1,0 +1,52 @@
+C:\Users\HIGH FIX\Desktop\ITI\Final Project - React Native\mobile-app
+├── app
+|  ├── (tabs)
+|  |  ├── explore.tsx
+|  |  ├── index.tsx
+|  |  └── _layout.tsx
+|  ├── modal.tsx
+|  └── _layout.tsx
+├── app.json
+├── assets
+|  └── images
+|     ├── android-icon-background.png
+|     ├── android-icon-foreground.png
+|     ├── android-icon-monochrome.png
+|     ├── favicon.png
+|     ├── icon.png
+|     ├── partial-react-logo.png
+|     ├── react-logo.png
+|     ├── react-logo@2x.png
+|     ├── react-logo@3x.png
+|     └── splash-icon.png
+├── babel.config.js
+├── components
+|  ├── external-link.tsx
+|  ├── haptic-tab.tsx
+|  ├── hello-wave.tsx
+|  ├── parallax-scroll-view.tsx
+|  ├── themed-text.tsx
+|  ├── themed-view.tsx
+|  └── ui
+|     ├── collapsible.tsx
+|     ├── icon-symbol.ios.tsx
+|     └── icon-symbol.tsx
+├── constants
+|  └── theme.ts
+├── eslint.config.js
+├── expo-env.d.ts
+├── hooks
+|  ├── use-color-scheme.ts
+|  ├── use-color-scheme.web.ts
+|  └── use-theme-color.ts
+├── package-lock.json
+├── package.json
+├── README.md
+├── scripts
+|  └── reset-project.js
+├── tailwind.config.js
+└── tsconfig.json
+
+directory: 2739 file: 11115
+
+ignored: directory (78)
