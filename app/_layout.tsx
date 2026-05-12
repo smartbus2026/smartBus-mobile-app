@@ -1,44 +1,31 @@
-// app/_layout.tsx
-import { AuthProvider, useAuth } from "../src/context/AuthContext";
-import { View, Text, ActivityIndicator } from "react-native";
-import { Stack, router } from "expo-router";
-import { useEffect } from "react";
+import { useEffect } from 'react';
+import { Slot, useRouter, useSegments } from 'expo-router';
+import { AuthProvider, useAuth } from '../src/context/AuthContext';
 
-function RootLayoutNav() {
-  const { token, role, isLoading } = useAuth();
+function RootGuard() {
+  const { token, userRole, isLoading } = useAuth();
+  const router = useRouter();
+  const segments = useSegments();
 
   useEffect(() => {
     if (isLoading) return;
-    if (!token) {
-      router.replace("/(auth)/login");
-    } else if (role === "admin") {
-      router.replace("/(admin)/dashboard");
-    } else {
-      router.replace("/(student)/dashboard");
+    const inAuth = segments[0] === '(auth)';
+    if (!token && !inAuth) {
+      router.replace('/(auth)/login');
+    } else if (token && inAuth) {
+      router.replace(
+        userRole === 'admin' ? '/(admin)/dashboard' : '/(student)/dashboard'
+      );
     }
-  }, [token, role, isLoading]);
+  }, [token, isLoading]);
 
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" }}>
-        <ActivityIndicator size="large" color="#fff" />
-      </View>
-    );
-  }
-
-  return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(student)" />
-      <Stack.Screen name="(admin)" />
-    </Stack>
-  );
+  return <Slot />;
 }
 
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootLayoutNav />
+      <RootGuard />
     </AuthProvider>
   );
 }

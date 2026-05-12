@@ -1,73 +1,65 @@
-// src/context/AuthContext.tsx
-import React, { createContext, useContext, useState, useEffect } from "react";
-import * as SecureStore from "expo-secure-store";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { User } from "../types";
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface AuthContextType {
-  user: User | null;
   token: string | null;
-  role: "student" | "admin" | null;
+  userRole: string | null;
+  isAuthenticated: boolean;
   isLoading: boolean;
-  login: (token: string, user: User) => Promise<void>;
+  login: (token: string, role: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | null>(null);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [role, setRole] = useState<"student" | "admin" | null>(null);
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [token, setToken]         = useState<string | null>(null);
+  const [userRole, setUserRole]   = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // بيلود الـ token من AsyncStorage لما التطبيق يفتح
   useEffect(() => {
-    loadStoredAuth();
+    const loadAuth = async () => {
+      try {
+        const savedToken = await AsyncStorage.getItem('token');
+        const savedRole  = await AsyncStorage.getItem('userRole');
+        if (savedToken) setToken(savedToken);
+        if (savedRole)  setUserRole(savedRole);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadAuth();
   }, []);
 
-  const loadStoredAuth = async () => {
-    try {
-      const storedToken = await SecureStore.getItemAsync("token");
-      const storedUser = await AsyncStorage.getItem("user");
-
-      if (storedToken && storedUser) {
-        const parsedUser: User = JSON.parse(storedUser);
-        setToken(storedToken);
-        setUser(parsedUser);
-        setRole(parsedUser.role);
-      }
-    } catch (error) {
-      console.error("Error loading auth:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const login = async (newToken: string, newUser: User) => {
-    await SecureStore.setItemAsync("token", newToken);
-    await AsyncStorage.setItem("user", JSON.stringify(newUser));
+  // نفس لوجيك الرياكت بالظبط — بس AsyncStorage بدل localStorage
+  const login = async (newToken: string, role: string) => {
+    await AsyncStorage.setItem('token', newToken);
+    await AsyncStorage.setItem('userRole', role);
     setToken(newToken);
-    setUser(newUser);
-    setRole(newUser.role);
+    setUserRole(role);
   };
 
   const logout = async () => {
-    await SecureStore.deleteItemAsync("token");
-    await AsyncStorage.removeItem("user");
+    await AsyncStorage.removeItem('token');
+    await AsyncStorage.removeItem('userRole');
     setToken(null);
-    setUser(null);
-    setRole(null);
+    setUserRole(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, role, isLoading, login, logout }}>
+    <AuthContext.Provider value={{
+      token, userRole, isAuthenticated: !!token, isLoading, login, logout
+    }}>
       {children}
     </AuthContext.Provider>
   );
-}
+};
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within AuthProvider");
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
   return context;
 };
