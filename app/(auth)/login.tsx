@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { Bus, Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
 import Api from '../../src/services/api';
 import { useAuth } from '../../src/context/AuthContext';
 
@@ -28,7 +29,6 @@ export default function LoginScreen() {
     resolver: zodResolver(loginSchema),
   });
 
-  // نفس لوجيك الرياكت بالظبط
   const onSubmit = async (data: LoginForm) => {
     setLoading(true);
     setServerError(null);
@@ -37,7 +37,6 @@ export default function LoginScreen() {
       const { token, user } = response.data;
       if (token) {
         await login(token, user.role);
-        // الـ navigation بيتعمل تلقائي من _layout حسب الـ role
       }
     } catch (error: any) {
       setServerError(error.response?.data?.message || 'Invalid email or password');
@@ -55,8 +54,12 @@ export default function LoginScreen() {
 
         {/* Logo */}
         <View style={s.logoWrap}>
-          <TouchableOpacity style={s.logoBox} onPress={() => router.push('/(auth)/welcome')}>
-            <Text style={s.logoIcon}>🚌</Text>
+          <TouchableOpacity
+            style={s.logoBox}
+            onPress={() => router.push('/(auth)/welcome')}
+            activeOpacity={0.85}
+          >
+            <Bus size={32} color="#000" fill="#000" />
           </TouchableOpacity>
           <Text style={s.logoTitle}>SmartBus</Text>
           <Text style={s.logoSub}>WELCOME BACK</Text>
@@ -67,6 +70,7 @@ export default function LoginScreen() {
           <Text style={s.cardTitle}>Sign In</Text>
           <Text style={s.cardSub}>Access your institutional portal</Text>
 
+          {/* Server Error */}
           {serverError && (
             <View style={s.errorBox}>
               <Text style={s.errorBoxText}>{serverError}</Text>
@@ -80,16 +84,19 @@ export default function LoginScreen() {
               control={control}
               name="email"
               render={({ field: { onChange, value } }) => (
-                <TextInput
-                  style={[s.input, errors.email && s.inputErr]}
-                  placeholder="name@university.edu"
-                  placeholderTextColor="#555"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  value={value}
-                  onChangeText={onChange}
-                  editable={!loading}
-                />
+                <View style={[s.inputWrap, errors.email && s.inputWrapErr]}>
+                  <Mail size={18} color="#8a8d91" style={s.inputIcon} />
+                  <TextInput
+                    style={s.input}
+                    placeholder="name@university.edu"
+                    placeholderTextColor="#555"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    value={value}
+                    onChangeText={onChange}
+                    editable={!loading}
+                  />
+                </View>
               )}
             />
             {errors.email && <Text style={s.fieldErr}>{errors.email.message}</Text>}
@@ -102,9 +109,10 @@ export default function LoginScreen() {
               control={control}
               name="password"
               render={({ field: { onChange, value } }) => (
-                <View>
+                <View style={[s.inputWrap, errors.password && s.inputWrapErr]}>
+                  <Lock size={18} color="#8a8d91" style={s.inputIcon} />
                   <TextInput
-                    style={[s.input, s.passInput, errors.password && s.inputErr]}
+                    style={[s.input, s.passInput]}
                     placeholder="••••••••••••"
                     placeholderTextColor="#555"
                     secureTextEntry={!showPassword}
@@ -112,8 +120,14 @@ export default function LoginScreen() {
                     onChangeText={onChange}
                     editable={!loading}
                   />
-                  <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPassword(!showPassword)}>
-                    <Text style={s.eyeIcon}>{showPassword ? '🙈' : '👁️'}</Text>
+                  <TouchableOpacity
+                    style={s.eyeBtn}
+                    onPress={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword
+                      ? <EyeOff size={18} color="#8a8d91" />
+                      : <Eye    size={18} color="#8a8d91" />
+                    }
                   </TouchableOpacity>
                 </View>
               )}
@@ -145,29 +159,35 @@ const s = StyleSheet.create({
   root:         { flex: 1, backgroundColor: '#0f1115' },
   scroll:       { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
 
+  // Logo
   logoWrap:     { alignItems: 'center', marginBottom: 32 },
   logoBox:      { width: 64, height: 64, backgroundColor: '#f7a01b', borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  logoIcon:     { fontSize: 28 },
   logoTitle:    { fontSize: 28, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },
   logoSub:      { fontSize: 10, color: '#8a8d91', letterSpacing: 3, marginTop: 4, fontWeight: '600' },
 
+  // Card
   card:         { width: '100%', maxWidth: 420, backgroundColor: '#1c1e26', borderWidth: 1, borderColor: '#2d3036', borderRadius: 32, padding: 28 },
   cardTitle:    { fontSize: 22, fontWeight: '700', color: '#fff', marginBottom: 4 },
   cardSub:      { fontSize: 13, color: '#8a8d91', marginBottom: 24, fontWeight: '500' },
 
+  // Error
   errorBox:     { backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)', borderRadius: 12, padding: 12, marginBottom: 16 },
   errorBoxText: { color: '#f87171', fontSize: 12, textAlign: 'center', fontWeight: '500' },
 
+  // Fields
   fieldWrap:    { marginBottom: 16 },
   label:        { fontSize: 10, color: '#8a8d91', fontWeight: '700', letterSpacing: 2, marginBottom: 6 },
-  input:        { backgroundColor: '#262a33', borderWidth: 1, borderColor: '#2d3036', borderRadius: 12, paddingVertical: 14, paddingHorizontal: 16, color: '#fff', fontSize: 14 },
-  inputErr:     { borderColor: '#ef4444' },
+
+  inputWrap:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#262a33', borderWidth: 1, borderColor: '#2d3036', borderRadius: 12 },
+  inputWrapErr: { borderColor: '#ef4444' },
+  inputIcon:    { marginLeft: 14 },
+  input:        { flex: 1, paddingVertical: 14, paddingHorizontal: 10, color: '#fff', fontSize: 14 },
+  passInput:    { paddingRight: 0 },
+  eyeBtn:       { padding: 14 },
+
   fieldErr:     { color: '#f87171', fontSize: 10, marginTop: 4, fontWeight: '500' },
 
-  passInput:    { paddingRight: 48 },
-  eyeBtn:       { position: 'absolute', right: 14, top: 14 },
-  eyeIcon:      { fontSize: 16 },
-
+  // Button
   btn:          { backgroundColor: '#f7a01b', borderRadius: 16, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
   btnDisabled:  { opacity: 0.7 },
   btnText:      { color: '#000', fontWeight: '700', fontSize: 15 },
