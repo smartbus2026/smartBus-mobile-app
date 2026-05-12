@@ -8,6 +8,8 @@ import {
 import { DrawerContentScrollView } from "@react-navigation/drawer";
 import { router } from "expo-router";
 import { useAuth } from "../../src/context/AuthContext";
+// ضفنا الاستدعاء بتاع البار هنا
+import Appbar from "../../src/components/bar"; 
 
 const ADMIN_NAV = [
   { name: "dashboard",     label: "Dashboard",        icon: LayoutGrid },
@@ -82,13 +84,19 @@ function AdminDrawerContent(props: any) {
 export default function AdminLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <Drawer
-        drawerContent={(props) => <AdminDrawerContent {...props} />}
-        screenOptions={{
-          headerShown: false,
-          drawerStyle: { backgroundColor: "#1c1e26", width: 280 },
-        }}
-      />
+      {/* ضفنا View تغلف الـ Drawer والـ Appbar مع بعض */}
+      <View style={{ flex: 1 }}>
+        <Drawer
+          drawerContent={(props) => <AdminDrawerContent {...props} />}
+          screenOptions={{
+            headerShown: false,
+            drawerStyle: { backgroundColor: "#1c1e26", width: 280 },
+          }}
+        />
+        
+        {/* البار الثابت هيترندر هنا مرة واحدة بس ويغطي التطبيق من تحت */}
+        {/* <Appbar /> */}
+      </View>
     </GestureHandlerRootView>
   );
 }

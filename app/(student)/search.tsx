@@ -1,11 +1,11 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-export default function Notifications() {
+export default function Search() {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Notifications</Text>
-      <Text>Your notifications will appear here.</Text>
+      <Text style={styles.title}>Search</Text>
+      <Text>Search for trips, routes, etc.</Text>
     </View>
   );
 }

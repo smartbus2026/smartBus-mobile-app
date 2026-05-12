@@ -3,10 +3,16 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, ActivityIndicator
 } from "react-native";
-import { Users, Bus, BarChart2, CheckCircle, Bell, Download, MapPin } from "lucide-react-native";
+import { 
+  Users, Bus, BarChart2, CheckCircle, 
+  Bell, Download, MapPin, Plus, Route 
+} from "lucide-react-native";
+import { useRouter } from "expo-router";
 import api from "../../src/services/api";
+import Appbar from "../../src/components/bar";
 
 export default function AdminDashboard() {
+  const router = useRouter();
   const [totalStudents, setTotalStudents] = useState(0);
   const [totalRoutes, setTotalRoutes] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -26,6 +32,13 @@ export default function AdminDashboard() {
     fetchStats();
   }, []);
 
+  // قسم الأفعال السريعة
+  const quickActions = [
+    { label: "Create Trip", icon: <Plus size={20} color="#fff" />, path: "/(admin)/create-trip", color: "#f7a01b" },
+    { label: "Add Route", icon: <Route size={20} color="#fff" />, path: "/(admin)/routes", color: "#3b82f6" },
+    { label: "Users", icon: <Users size={20} color="#fff" />, path: "/(admin)/users", color: "#22c55e" },
+  ];
+
   const stats = [
     { title: "Total Students", value: loading ? "..." : totalStudents.toLocaleString(), trend: "+12% from last week", icon: <Users size={22} color="#f7a01b" />, positive: true },
     { title: "Active Routes", value: loading ? "..." : totalRoutes.toString(), trend: "Fully operational", icon: <Bus size={22} color="#f7a01b" />, positive: true },
@@ -40,104 +53,188 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-
-      {/* Stats Grid */}
-      <View style={styles.statsGrid}>
-        {stats.map((stat, i) => (
-          <View key={i} style={styles.statCard}>
-            <View style={styles.statTop}>
-              <Text style={styles.statTitle}>{stat.title}</Text>
-              <View style={styles.iconBox}>{stat.icon}</View>
+    <View style={styles.mainWrapper}>
+      <ScrollView 
+        style={styles.container} 
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header البديل للتوب بار القديم */}
+        <View style={styles.pageHeader}>
+            <View>
+                <Text style={styles.welcomeText}>System Overview</Text>
+                <Text style={styles.dateText}>Admin Command Center</Text>
             </View>
-            <Text style={styles.statValue}>{stat.value}</Text>
-            <Text style={[styles.statTrend, { color: stat.positive ? "#22c55e" : "#8a8d91" }]}>
-              {stat.trend}
-            </Text>
+            <View style={styles.adminBadge}>
+                <Text style={styles.adminBadgeText}>ADMIN PANEL</Text>
+            </View>
+        </View>
+
+        {/* قسم الأفعال السريعة - Quick Actions */}
+        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <View style={styles.quickActionsGrid}>
+          {quickActions.map((action, i) => (
+            <TouchableOpacity 
+              key={i} 
+              style={styles.actionCard}
+              onPress={() => router.push(action.path as any)}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.actionIcon, { backgroundColor: action.color }]}>
+                {action.icon}
+              </View>
+              <Text style={styles.actionLabel}>{action.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Stats Grid */}
+        <Text style={[styles.sectionTitle, { marginTop: 10, marginBottom: 12 }]}>System Performance</Text>
+        <View style={styles.statsGrid}>
+          {stats.map((stat, i) => (
+            <View key={i} style={styles.statCard}>
+              <View style={styles.statTop}>
+                <Text style={styles.statTitle}>{stat.title}</Text>
+                <View style={styles.iconBox}>{stat.icon}</View>
+              </View>
+              <Text style={styles.statValue}>{stat.value}</Text>
+              <Text style={[styles.statTrend, { color: stat.positive ? "#22c55e" : "#8a8d91" }]}>
+                {stat.trend}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Live Tracking Card */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Fleet Live Tracking</Text>
+          <Text style={styles.sectionLink}>NETWORK_SATELLITE ↗</Text>
+        </View>
+        <View style={styles.mapCard}>
+          <View style={styles.liveIndicator}>
+            <View style={styles.liveCircle} />
+            <Text style={styles.liveText}>Aswan_Fleet_Active</Text>
           </View>
+          <Text style={styles.mapPlaceholder}>[ Live Map ]</Text>
+        </View>
+
+        {/* Alerts */}
+        <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>System Intelligence</Text>
+        {alerts.map((alert, i) => (
+          <TouchableOpacity key={i} style={styles.alertCard} activeOpacity={0.8}>
+            <View style={styles.alertTop}>
+              <Bell size={14} color={alert.color} />
+              <Text style={styles.alertTitle}>{alert.t}</Text>
+            </View>
+            <Text style={styles.alertMsg}>{alert.m}</Text>
+            <Text style={styles.alertTime}>{alert.time}</Text>
+          </TouchableOpacity>
         ))}
-      </View>
 
-      {/* Live Tracking Card */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Fleet Live Tracking</Text>
-        <Text style={styles.sectionLink}>NETWORK_SATELLITE ↗</Text>
-      </View>
-      <View style={styles.mapCard}>
-        <View style={styles.liveIndicator}>
-          <View style={styles.liveCircle} />
-          <Text style={styles.liveText}>Aswan_Fleet_Active</Text>
-        </View>
-        <Text style={styles.mapPlaceholder}>[ Live Map ]</Text>
-      </View>
-
-      {/* Alerts */}
-      <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>System Intelligence</Text>
-      {alerts.map((alert, i) => (
-        <TouchableOpacity key={i} style={styles.alertCard} activeOpacity={0.8}>
-          <View style={styles.alertTop}>
-            <Bell size={14} color={alert.color} />
-            <Text style={styles.alertTitle}>{alert.t}</Text>
+        {/* Operational Load */}
+        <View style={styles.loadCard}>
+          <View style={styles.loadHeader}>
+            <Text style={styles.loadTitle}>Operational Load</Text>
+            <View style={styles.loadBadge}>
+              <Text style={styles.loadBadgeText}>OPTIMIZED</Text>
+            </View>
           </View>
-          <Text style={styles.alertMsg}>{alert.m}</Text>
-          <Text style={styles.alertTime}>{alert.time}</Text>
-        </TouchableOpacity>
-      ))}
-
-      {/* Operational Load */}
-      <View style={styles.loadCard}>
-        <View style={styles.loadHeader}>
-          <Text style={styles.loadTitle}>Operational Load</Text>
-          <View style={styles.loadBadge}>
-            <Text style={styles.loadBadgeText}>OPTIMIZED</Text>
+          <View style={styles.progressBar}>
+            <View style={styles.progressFill} />
           </View>
+          <Text style={styles.loadFooter}>
+            {totalStudents} Verified Students On-Board
+          </Text>
         </View>
-        <View style={styles.progressBar}>
-          <View style={styles.progressFill} />
-        </View>
-        <Text style={styles.loadFooter}>
-          {totalStudents} Verified Students On-Board
-        </Text>
-      </View>
 
-      {/* Fleet Table */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Active Fleet Log</Text>
-        <TouchableOpacity style={styles.exportBtn}>
-          <Download size={12} color="#8a8d91" />
-          <Text style={styles.exportText}>EXPORT</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.tableCard}>
-        <View style={styles.tableHeader}>
-          <Text style={[styles.tableHead, { flex: 1 }]}>Fleet ID</Text>
-          <Text style={[styles.tableHead, { flex: 2 }]}>Route</Text>
-          <Text style={[styles.tableHead, { flex: 1 }]}>Seats</Text>
-          <Text style={[styles.tableHead, { flex: 1, textAlign: "right" }]}>Status</Text>
+        {/* Fleet Table */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Active Fleet Log</Text>
+          <TouchableOpacity style={styles.exportBtn}>
+            <Download size={12} color="#8a8d91" />
+            <Text style={styles.exportText}>EXPORT</Text>
+          </TouchableOpacity>
         </View>
-        <View style={styles.tableRow}>
-          <Text style={[styles.tableCell, { flex: 1, color: "#fff" }]}>T-ASW-001</Text>
-          <View style={{ flex: 2, flexDirection: "row", alignItems: "center", gap: 4 }}>
-            <MapPin size={12} color="#f7a01b" />
-            <Text style={[styles.tableCell, { color: "#8a8d91" }]}>Aqaleem → Stadium</Text>
+
+        <View style={styles.tableCard}>
+          <View style={styles.tableHeader}>
+            <Text style={[styles.tableHead, { flex: 1 }]}>Fleet ID</Text>
+            <Text style={[styles.tableHead, { flex: 2 }]}>Route</Text>
+            <Text style={[styles.tableHead, { flex: 1 }]}>Seats</Text>
+            <Text style={[styles.tableHead, { flex: 1, textAlign: "right" }]}>Status</Text>
           </View>
-          <Text style={[styles.tableCell, { flex: 1, color: "#f7a01b" }]}>32/40</Text>
-          <View style={{ flex: 1, alignItems: "flex-end" }}>
-            <View style={styles.statusBadge}>
-              <Text style={styles.statusText}>DEPLOYED</Text>
+          <View style={styles.tableRow}>
+            <Text style={[styles.tableCell, { flex: 1, color: "#fff" }]}>T-ASW-001</Text>
+            <View style={{ flex: 2, flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <MapPin size={12} color="#f7a01b" />
+              <Text style={[styles.tableCell, { color: "#8a8d91" }]}>Aqaleem → Stadium</Text>
+            </View>
+            <Text style={[styles.tableCell, { flex: 1, color: "#f7a01b" }]}>32/40</Text>
+            <View style={{ flex: 1, alignItems: "flex-end" }}>
+              <View style={styles.statusBadge}>
+                <Text style={styles.statusText}>DEPLOYED</Text>
+              </View>
             </View>
           </View>
         </View>
-      </View>
 
-    </ScrollView>
+      </ScrollView>
+
+      {/* الـ Bottom Bar يتحط هنا عشان يفضل ثابت تحت */}
+      <Appbar />
+            {/* <Appbar /> */}
+
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0f1115" },
-  content: { padding: 20, paddingBottom: 40 },
+  mainWrapper: { flex: 1, backgroundColor: "#0f1115" },
+  container: { flex: 1 },
+  content: { padding: 20, paddingBottom: 120 }, // مساحة كافية للـ Bottom Bar
+
+  pageHeader: { 
+    flexDirection: "row", 
+    justifyContent: "space-between", 
+    alignItems: "center",
+    marginTop: 40, 
+    marginBottom: 25 
+  },
+  welcomeText: { fontSize: 22, fontWeight: "900", color: "#fff", letterSpacing: -0.5 },
+  dateText: { fontSize: 12, color: "#8a8d91", fontWeight: "600", marginTop: 2 },
+  adminBadge: { backgroundColor: "rgba(247,160,27,0.1)", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: "rgba(247,160,27,0.2)" },
+  adminBadgeText: { fontSize: 8, fontWeight: "900", color: "#f7a01b", letterSpacing: 1 },
+
+  // ستايل الكروت السريعة
+  quickActionsGrid: { 
+    flexDirection: "row", 
+    gap: 12, 
+    marginBottom: 25, 
+    marginTop: 12 
+  },
+  actionCard: {
+    flex: 1,
+    backgroundColor: "#1c1e26",
+    borderRadius: 20,
+    padding: 15,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#2d3036",
+  },
+  actionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  actionLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#fff",
+    textAlign: "center",
+  },
 
   statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 24 },
   statCard: {
@@ -157,7 +254,7 @@ const styles = StyleSheet.create({
   statTrend: { fontSize: 8, fontWeight: "900", textTransform: "uppercase", letterSpacing: 1 },
 
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingHorizontal: 4 },
-  sectionTitle: { fontSize: 9, fontWeight: "900", color: "#fff", letterSpacing: 3, textTransform: "uppercase" },
+  sectionTitle: { fontSize: 9, fontWeight: "900", color: "#8a8d91", letterSpacing: 2, textTransform: "uppercase" },
   sectionLink: { fontSize: 8, color: "#f7a01b", fontWeight: "900", letterSpacing: 2 },
 
   mapCard: {
