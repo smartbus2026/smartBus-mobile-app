@@ -1,25 +1,27 @@
 import React from "react";
-import { View, TouchableOpacity, StyleSheet, Text, Platform } from "react-native";
-import { Home, Search, Bell, Menu } from "lucide-react-native";
+import { View, TouchableOpacity, Text, Platform } from "react-native";
+import { Home, Route, Bell, Menu } from "lucide-react-native";
 import { useRouter, usePathname } from "expo-router";
 import { DrawerActions } from "@react-navigation/native";
 import { useNavigation } from "@react-navigation/native";
+import { useThemeColor } from "../../constants/theme"; // 🟢 استدعاء الهوك
 
 export default function Appbar() {
+  const colors = useThemeColor(); // 🟢 سحب الألوان
   const router = useRouter();
   const pathname = usePathname();
   const navigation = useNavigation();
 
-  const isActive = (route: string) => pathname.includes(route);
+  // خليناها toLowerCase عشان تتطابق صح مع اللينكات
+  const isActive = (route: string) => pathname.includes(route.toLowerCase());
 
   const tabs = [
     { id: "dashboard", label: "Home", icon: Home, path: "/(admin)/dashboard" },
-    { id: "search", label: "Search", icon: Search, path: "/search" },
+    { id: "trips", label: "Trips", icon: Route, path: "/(admin)/trips" }, // 🟢 اتعدلت عشان تماتش الراوتر صح
     { id: "notifications", label: "Alerts", icon: Bell, path: "/(admin)/notifications" },
   ];
 
   const openDrawer = () => {
-    // بنجرب كل المستويات
     try {
       navigation.dispatch(DrawerActions.openDrawer());
     } catch {
@@ -32,48 +34,46 @@ export default function Appbar() {
   };
 
   return (
-    <View style={styles.container}>
+    <View 
+      className="flex-row justify-around items-center absolute bottom-0 left-0 right-0 border-t pt-2"
+      style={{ 
+        backgroundColor: colors.card, 
+        borderTopColor: colors.border,
+        height: Platform.OS === "ios" ? 105 : 90,
+        paddingBottom: Platform.OS === "ios" ? 35 : 25,
+      }}
+    >
       {tabs.map((tab) => {
         const Icon = tab.icon;
         const active = isActive(tab.id);
         return (
           <TouchableOpacity
             key={tab.id}
-            style={styles.tab}
+            className="items-center justify-center flex-1"
             onPress={() => router.push(tab.path as any)}
             activeOpacity={0.7}
           >
-            <Icon size={22} color={active ? "#f7a01b" : "#8a8d91"} />
-            <Text style={[styles.tabLabel, active && styles.activeLabel]}>{tab.label}</Text>
+            <Icon size={22} color={active ? colors.tint : colors.icon} />
+            <Text 
+              className="text-[10px] font-bold mt-1" 
+              style={{ color: active ? colors.tint : colors.icon }}
+            >
+              {tab.label}
+            </Text>
           </TouchableOpacity>
         );
       })}
 
-      <TouchableOpacity style={styles.tab} onPress={openDrawer} activeOpacity={0.7}>
-        <Menu size={22} color="#8a8d91" />
-        <Text style={styles.tabLabel}>Menu</Text>
+      <TouchableOpacity 
+        className="items-center justify-center flex-1" 
+        onPress={openDrawer} 
+        activeOpacity={0.7}
+      >
+        <Menu size={22} color={colors.icon} />
+        <Text className="text-[10px] font-bold mt-1" style={{ color: colors.icon }}>
+          Menu
+        </Text>
       </TouchableOpacity>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    backgroundColor: "#1c1e26",
-    height: Platform.OS === "ios" ? 105 : 90,
-    borderTopWidth: 1,
-    borderTopColor: "#2d3036",
-    justifyContent: "space-around",
-    alignItems: "center",
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingBottom: Platform.OS === "ios" ? 35 : 25,
-    paddingTop: 8,
-  },
-  tab: { alignItems: "center", justifyContent: "center", flex: 1 },
-  tabLabel: { fontSize: 10, fontWeight: "700", color: "#8a8d91", marginTop: 4 },
-  activeLabel: { color: "#f7a01b" },
-});

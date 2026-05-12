@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-  View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, ActivityIndicator
+  View, Text, ScrollView, TouchableOpacity, ActivityIndicator
 } from "react-native";
 import { 
   Users, Bus, BarChart2, CheckCircle, 
@@ -10,8 +9,10 @@ import {
 import { useRouter } from "expo-router";
 import api from "../../src/services/api";
 import Appbar from "../../src/components/bar";
+import { useThemeColor } from "../../constants/theme"; // 🟢 استدعاء الهوك بتاعنا
 
 export default function AdminDashboard() {
+  const colors = useThemeColor(); // 🟢 سحب الألوان
   const router = useRouter();
   const [totalStudents, setTotalStudents] = useState(0);
   const [totalRoutes, setTotalRoutes] = useState(0);
@@ -34,71 +35,83 @@ export default function AdminDashboard() {
 
   // قسم الأفعال السريعة
   const quickActions = [
-    { label: "Create Trip", icon: <Plus size={20} color="#fff" />, path: "/(admin)/create-trip", color: "#f7a01b" },
+    { label: "Create Trip", icon: <Plus size={20} color={colors.background} />, path: "/(admin)/create-trip", color: colors.tint },
     { label: "Add Route", icon: <Route size={20} color="#fff" />, path: "/(admin)/routes", color: "#3b82f6" },
-    { label: "Users", icon: <Users size={20} color="#fff" />, path: "/(admin)/users", color: "#22c55e" },
+    { label: "Users", icon: <Users size={20} color="#fff" />, path: "/(admin)/users", color: colors.success || "#22c55e" },
   ];
 
   const stats = [
-    { title: "Total Students", value: loading ? "..." : totalStudents.toLocaleString(), trend: "+12% from last week", icon: <Users size={22} color="#f7a01b" />, positive: true },
-    { title: "Active Routes", value: loading ? "..." : totalRoutes.toString(), trend: "Fully operational", icon: <Bus size={22} color="#f7a01b" />, positive: true },
-    { title: "Occupancy Rate", value: "84%", trend: "+5% from yesterday", icon: <BarChart2 size={22} color="#f7a01b" />, positive: true },
-    { title: "System Status", value: "Stable", trend: "All systems online", icon: <CheckCircle size={22} color="#f7a01b" />, positive: true },
+    { title: "Total Students", value: loading ? "..." : totalStudents.toLocaleString(), trend: "+12% from last week", icon: <Users size={22} color={colors.tint} />, positive: true },
+    { title: "Active Routes", value: loading ? "..." : totalRoutes.toString(), trend: "Fully operational", icon: <Bus size={22} color={colors.tint} />, positive: true },
+    { title: "Occupancy Rate", value: "84%", trend: "+5% from yesterday", icon: <BarChart2 size={22} color={colors.tint} />, positive: true },
+    { title: "System Status", value: "Stable", trend: "All systems online", icon: <CheckCircle size={22} color={colors.tint} />, positive: true },
   ];
 
   const alerts = [
-    { t: "Registration closing", m: "Window closes in 2h", color: "#f7a01b", time: "5 MIN AGO" },
-    { t: "Fleet Update", m: "Bus #3 reached Stadium", color: "#22c55e", time: "17 MIN AGO" },
+    { t: "Registration closing", m: "Window closes in 2h", color: colors.tint, time: "5 MIN AGO" },
+    { t: "Fleet Update", m: "Bus #3 reached Stadium", color: colors.success || "#22c55e", time: "17 MIN AGO" },
     { t: "New User", m: "Student ID #924 verified", color: "#3b82f6", time: "29 MIN AGO" },
   ];
 
   return (
-    <View style={styles.mainWrapper}>
+    <View className="flex-1" style={{ backgroundColor: colors.background }}>
       <ScrollView 
-        style={styles.container} 
-        contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 60, paddingBottom: 120 }} // 🟢 ظبطنا البادينج من فوق وتحت
       >
-        {/* Header البديل للتوب بار القديم */}
-        <View style={styles.pageHeader}>
+        {/* Header */}
+        <View className="flex-row justify-between items-center mb-6">
             <View>
-                <Text style={styles.welcomeText}>System Overview</Text>
-                <Text style={styles.dateText}>Admin Command Center</Text>
+                <Text className="text-[22px] font-black tracking-tight" style={{ color: colors.text }}>System Overview</Text>
+                <Text className="text-xs font-semibold mt-1" style={{ color: colors.icon }}>Admin Command Center</Text>
             </View>
-            <View style={styles.adminBadge}>
-                <Text style={styles.adminBadgeText}>ADMIN PANEL</Text>
+            <View 
+              className="px-2.5 py-1.5 rounded-lg border" 
+              style={{ backgroundColor: `${colors.tint}1A`, borderColor: `${colors.tint}33` }}
+            >
+                <Text className="text-[8px] font-black tracking-widest" style={{ color: colors.tint }}>ADMIN PANEL</Text>
             </View>
         </View>
 
-        {/* قسم الأفعال السريعة - Quick Actions */}
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <View style={styles.quickActionsGrid}>
+        {/* Quick Actions */}
+        <Text className="text-[9px] font-black uppercase tracking-widest mb-3" style={{ color: colors.icon }}>Quick Actions</Text>
+        <View className="flex-row gap-3 mb-6">
           {quickActions.map((action, i) => (
             <TouchableOpacity 
               key={i} 
-              style={styles.actionCard}
+              className="flex-1 rounded-[20px] p-4 items-center border"
+              style={{ backgroundColor: colors.card, borderColor: colors.border }}
               onPress={() => router.push(action.path as any)}
               activeOpacity={0.8}
             >
-              <View style={[styles.actionIcon, { backgroundColor: action.color }]}>
+              <View className="w-10 h-10 rounded-[12px] items-center justify-center mb-2" style={{ backgroundColor: action.color }}>
                 {action.icon}
               </View>
-              <Text style={styles.actionLabel}>{action.label}</Text>
+              <Text className="text-[10px] font-extrabold text-center" style={{ color: colors.text }}>{action.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
         {/* Stats Grid */}
-        <Text style={[styles.sectionTitle, { marginTop: 10, marginBottom: 12 }]}>System Performance</Text>
-        <View style={styles.statsGrid}>
+        <Text className="text-[9px] font-black uppercase tracking-widest mt-2 mb-3" style={{ color: colors.icon }}>System Performance</Text>
+        <View className="flex-row flex-wrap justify-between mb-6">
           {stats.map((stat, i) => (
-            <View key={i} style={styles.statCard}>
-              <View style={styles.statTop}>
-                <Text style={styles.statTitle}>{stat.title}</Text>
-                <View style={styles.iconBox}>{stat.icon}</View>
+            <View 
+              key={i} 
+              className="w-[48%] rounded-[24px] p-5 mb-3 border"
+              style={{ backgroundColor: colors.card, borderColor: colors.border }}
+            >
+              <View className="flex-row justify-between items-start mb-3">
+                <Text className="text-[9px] font-black uppercase tracking-widest flex-1 mr-2" style={{ color: colors.icon }}>{stat.title}</Text>
+                <View 
+                  className="w-11 h-11 rounded-[14px] items-center justify-center border"
+                  style={{ backgroundColor: `${colors.tint}1A`, borderColor: `${colors.tint}26` }}
+                >
+                  {stat.icon}
+                </View>
               </View>
-              <Text style={styles.statValue}>{stat.value}</Text>
-              <Text style={[styles.statTrend, { color: stat.positive ? "#22c55e" : "#8a8d91" }]}>
+              <Text className="text-[28px] font-black tracking-tighter mb-1" style={{ color: colors.text }}>{stat.value}</Text>
+              <Text className="text-[8px] font-black uppercase tracking-widest" style={{ color: stat.positive ? (colors.success || "#22c55e") : colors.icon }}>
                 {stat.trend}
               </Text>
             </View>
@@ -106,73 +119,90 @@ export default function AdminDashboard() {
         </View>
 
         {/* Live Tracking Card */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Fleet Live Tracking</Text>
-          <Text style={styles.sectionLink}>NETWORK_SATELLITE ↗</Text>
+        <View className="flex-row justify-between items-center mb-3 px-1">
+          <Text className="text-[9px] font-black uppercase tracking-widest" style={{ color: colors.icon }}>Fleet Live Tracking</Text>
+          <Text className="text-[8px] font-black tracking-widest" style={{ color: colors.tint }}>NETWORK_SATELLITE ↗</Text>
         </View>
-        <View style={styles.mapCard}>
-          <View style={styles.liveIndicator}>
-            <View style={styles.liveCircle} />
-            <Text style={styles.liveText}>Aswan_Fleet_Active</Text>
+        <View 
+          className="h-[200px] rounded-[32px] border mb-6 items-center justify-center overflow-hidden"
+          style={{ backgroundColor: colors.card, borderColor: colors.border }}
+        >
+          <View 
+            className="absolute top-4 left-4 flex-row items-center gap-2 rounded-xl px-3 py-1.5 border"
+            style={{ backgroundColor: "rgba(0,0,0,0.6)", borderColor: "rgba(34,197,94,0.3)" }}
+          >
+            <View className="w-2 h-2 rounded-full" style={{ backgroundColor: colors.success || "#22c55e" }} />
+            <Text className="text-[8px] font-black tracking-widest" style={{ color: colors.success || "#22c55e" }}>Aswan_Fleet_Active</Text>
           </View>
-          <Text style={styles.mapPlaceholder}>[ Live Map ]</Text>
+          <Text className="text-[13px] font-bold" style={{ color: colors.border }}>[ Live Map Placeholder ]</Text>
         </View>
 
         {/* Alerts */}
-        <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>System Intelligence</Text>
+        <Text className="text-[9px] font-black uppercase tracking-widest mb-3" style={{ color: colors.icon }}>System Intelligence</Text>
         {alerts.map((alert, i) => (
-          <TouchableOpacity key={i} style={styles.alertCard} activeOpacity={0.8}>
-            <View style={styles.alertTop}>
+          <TouchableOpacity 
+            key={i} 
+            className="rounded-[24px] p-[18px] mb-2.5 border"
+            style={{ backgroundColor: colors.card, borderColor: colors.border }}
+            activeOpacity={0.8}
+          >
+            <View className="flex-row items-center gap-2 mb-1.5">
               <Bell size={14} color={alert.color} />
-              <Text style={styles.alertTitle}>{alert.t}</Text>
+              <Text className="text-[9px] font-black uppercase tracking-widest" style={{ color: colors.text }}>{alert.t}</Text>
             </View>
-            <Text style={styles.alertMsg}>{alert.m}</Text>
-            <Text style={styles.alertTime}>{alert.time}</Text>
+            <Text className="text-[11px] font-bold mb-1.5" style={{ color: colors.icon }}>{alert.m}</Text>
+            <Text className="text-[8px] font-black uppercase" style={{ color: colors.icon, opacity: 0.7 }}>{alert.time}</Text>
           </TouchableOpacity>
         ))}
 
         {/* Operational Load */}
-        <View style={styles.loadCard}>
-          <View style={styles.loadHeader}>
-            <Text style={styles.loadTitle}>Operational Load</Text>
-            <View style={styles.loadBadge}>
-              <Text style={styles.loadBadgeText}>OPTIMIZED</Text>
+        <View className="rounded-[28px] p-6 my-4" style={{ backgroundColor: colors.tint }}>
+          <View className="flex-row justify-between items-center mb-3.5">
+            <Text className="text-[9px] font-black uppercase tracking-widest" style={{ color: colors.background }}>Operational Load</Text>
+            <View className="rounded-lg px-2 py-1" style={{ backgroundColor: "rgba(0,0,0,0.1)" }}>
+              <Text className="text-[8px] font-black" style={{ color: colors.background }}>OPTIMIZED</Text>
             </View>
           </View>
-          <View style={styles.progressBar}>
-            <View style={styles.progressFill} />
+          <View className="h-2 rounded-full mb-3.5 overflow-hidden" style={{ backgroundColor: "rgba(0,0,0,0.15)" }}>
+            <View className="h-full w-[78%] rounded-full" style={{ backgroundColor: colors.background }} />
           </View>
-          <Text style={styles.loadFooter}>
+          <Text className="text-[10px] font-black uppercase tracking-widest" style={{ color: colors.background }}>
             {totalStudents} Verified Students On-Board
           </Text>
         </View>
 
         {/* Fleet Table */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Active Fleet Log</Text>
-          <TouchableOpacity style={styles.exportBtn}>
-            <Download size={12} color="#8a8d91" />
-            <Text style={styles.exportText}>EXPORT</Text>
+        <View className="flex-row justify-between items-center mb-3 mt-2 px-1">
+          <Text className="text-[9px] font-black uppercase tracking-widest" style={{ color: colors.icon }}>Active Fleet Log</Text>
+          <TouchableOpacity 
+            className="flex-row items-center gap-1.5 rounded-xl px-3 py-2 border"
+            style={{ backgroundColor: colors.card, borderColor: colors.border }}
+          >
+            <Download size={12} color={colors.icon} />
+            <Text className="text-[8px] font-black" style={{ color: colors.icon }}>EXPORT</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.tableCard}>
-          <View style={styles.tableHeader}>
-            <Text style={[styles.tableHead, { flex: 1 }]}>Fleet ID</Text>
-            <Text style={[styles.tableHead, { flex: 2 }]}>Route</Text>
-            <Text style={[styles.tableHead, { flex: 1 }]}>Seats</Text>
-            <Text style={[styles.tableHead, { flex: 1, textAlign: "right" }]}>Status</Text>
+        <View className="rounded-[24px] border overflow-hidden" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
+          <View className="flex-row px-4 py-3 border-b" style={{ backgroundColor: colors.background, borderBottomColor: colors.border }}>
+            <Text className="text-[8px] font-black uppercase tracking-widest" style={{ flex: 1, color: colors.icon }}>Fleet ID</Text>
+            <Text className="text-[8px] font-black uppercase tracking-widest" style={{ flex: 2, color: colors.icon }}>Route</Text>
+            <Text className="text-[8px] font-black uppercase tracking-widest" style={{ flex: 1, color: colors.icon }}>Seats</Text>
+            <Text className="text-[8px] font-black uppercase tracking-widest text-right" style={{ flex: 1, color: colors.icon }}>Status</Text>
           </View>
-          <View style={styles.tableRow}>
-            <Text style={[styles.tableCell, { flex: 1, color: "#fff" }]}>T-ASW-001</Text>
+          <View className="flex-row items-center px-4 py-3.5">
+            <Text className="text-[10px] font-black uppercase" style={{ flex: 1, color: colors.text }}>T-ASW-001</Text>
             <View style={{ flex: 2, flexDirection: "row", alignItems: "center", gap: 4 }}>
-              <MapPin size={12} color="#f7a01b" />
-              <Text style={[styles.tableCell, { color: "#8a8d91" }]}>Aqaleem → Stadium</Text>
+              <MapPin size={12} color={colors.tint} />
+              <Text className="text-[10px] font-bold" style={{ color: colors.icon }}>Aqaleem → Stadium</Text>
             </View>
-            <Text style={[styles.tableCell, { flex: 1, color: "#f7a01b" }]}>32/40</Text>
+            <Text className="text-[10px] font-black uppercase" style={{ flex: 1, color: colors.tint }}>32/40</Text>
             <View style={{ flex: 1, alignItems: "flex-end" }}>
-              <View style={styles.statusBadge}>
-                <Text style={styles.statusText}>DEPLOYED</Text>
+              <View 
+                className="rounded-full px-2 py-1 border"
+                style={{ backgroundColor: "rgba(34,197,94,0.1)", borderColor: "rgba(34,197,94,0.2)" }}
+              >
+                <Text className="text-[7px] font-black tracking-widest" style={{ color: colors.success || "#22c55e" }}>DEPLOYED</Text>
               </View>
             </View>
           </View>
@@ -180,147 +210,8 @@ export default function AdminDashboard() {
 
       </ScrollView>
 
-      {/* الـ Bottom Bar يتحط هنا عشان يفضل ثابت تحت */}
+      {/* Appbar ثابت تحت */}
       <Appbar />
-            {/* <Appbar /> */}
-
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  mainWrapper: { flex: 1, backgroundColor: "#0f1115" },
-  container: { flex: 1 },
-  content: { padding: 20, paddingBottom: 120 }, // مساحة كافية للـ Bottom Bar
-
-  pageHeader: { 
-    flexDirection: "row", 
-    justifyContent: "space-between", 
-    alignItems: "center",
-    marginTop: 40, 
-    marginBottom: 25 
-  },
-  welcomeText: { fontSize: 22, fontWeight: "900", color: "#fff", letterSpacing: -0.5 },
-  dateText: { fontSize: 12, color: "#8a8d91", fontWeight: "600", marginTop: 2 },
-  adminBadge: { backgroundColor: "rgba(247,160,27,0.1)", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: "rgba(247,160,27,0.2)" },
-  adminBadgeText: { fontSize: 8, fontWeight: "900", color: "#f7a01b", letterSpacing: 1 },
-
-  // ستايل الكروت السريعة
-  quickActionsGrid: { 
-    flexDirection: "row", 
-    gap: 12, 
-    marginBottom: 25, 
-    marginTop: 12 
-  },
-  actionCard: {
-    flex: 1,
-    backgroundColor: "#1c1e26",
-    borderRadius: 20,
-    padding: 15,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#2d3036",
-  },
-  actionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
-  },
-  actionLabel: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: "#fff",
-    textAlign: "center",
-  },
-
-  statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 24 },
-  statCard: {
-    width: "47%", backgroundColor: "#1c1e26",
-    borderRadius: 24, padding: 20,
-    borderWidth: 1, borderColor: "#2d3036",
-  },
-  statTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 },
-  statTitle: { fontSize: 9, fontWeight: "900", color: "#8a8d91", letterSpacing: 1.5, textTransform: "uppercase", flex: 1 },
-  iconBox: {
-    width: 44, height: 44, borderRadius: 14,
-    backgroundColor: "rgba(247,160,27,0.1)",
-    borderWidth: 1, borderColor: "rgba(247,160,27,0.15)",
-    alignItems: "center", justifyContent: "center",
-  },
-  statValue: { fontSize: 28, fontWeight: "900", color: "#fff", letterSpacing: -1, marginBottom: 4 },
-  statTrend: { fontSize: 8, fontWeight: "900", textTransform: "uppercase", letterSpacing: 1 },
-
-  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingHorizontal: 4 },
-  sectionTitle: { fontSize: 9, fontWeight: "900", color: "#8a8d91", letterSpacing: 2, textTransform: "uppercase" },
-  sectionLink: { fontSize: 8, color: "#f7a01b", fontWeight: "900", letterSpacing: 2 },
-
-  mapCard: {
-    height: 200, backgroundColor: "#1c1e26",
-    borderRadius: 32, borderWidth: 1, borderColor: "#2d3036",
-    marginBottom: 24, alignItems: "center", justifyContent: "center",
-    overflow: "hidden",
-  },
-  liveIndicator: {
-    position: "absolute", top: 16, left: 16,
-    flexDirection: "row", alignItems: "center", gap: 8,
-    backgroundColor: "rgba(28,30,38,0.9)", borderRadius: 12,
-    paddingHorizontal: 12, paddingVertical: 6,
-    borderWidth: 1, borderColor: "rgba(34,197,94,0.3)",
-  },
-  liveCircle: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#22c55e" },
-  liveText: { fontSize: 8, color: "#22c55e", fontWeight: "900", letterSpacing: 2 },
-  mapPlaceholder: { color: "#2d3036", fontSize: 13, fontWeight: "700" },
-
-  alertCard: {
-    backgroundColor: "#1c1e26", borderWidth: 1, borderColor: "#2d3036",
-    borderRadius: 24, padding: 18, marginBottom: 10,
-  },
-  alertTop: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
-  alertTitle: { fontSize: 9, fontWeight: "900", color: "#fff", textTransform: "uppercase", letterSpacing: 1.5 },
-  alertMsg: { fontSize: 11, color: "#8a8d91", fontWeight: "700", marginBottom: 6 },
-  alertTime: { fontSize: 8, color: "#444", fontWeight: "900", textTransform: "uppercase" },
-
-  loadCard: {
-    backgroundColor: "#f7a01b", borderRadius: 28,
-    padding: 24, marginVertical: 16,
-  },
-  loadHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
-  loadTitle: { fontSize: 9, fontWeight: "900", color: "rgba(0,0,0,0.7)", textTransform: "uppercase", letterSpacing: 2 },
-  loadBadge: { backgroundColor: "rgba(0,0,0,0.1)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  loadBadgeText: { fontSize: 8, fontWeight: "900", color: "rgba(0,0,0,0.7)" },
-  progressBar: { height: 8, backgroundColor: "rgba(0,0,0,0.15)", borderRadius: 4, marginBottom: 14, overflow: "hidden" },
-  progressFill: { height: "100%", width: "78%", backgroundColor: "#0f1115", borderRadius: 4 },
-  loadFooter: { fontSize: 10, fontWeight: "900", color: "#0f1115", textTransform: "uppercase", letterSpacing: 1 },
-
-  tableCard: {
-    backgroundColor: "#1c1e26", borderRadius: 24,
-    borderWidth: 1, borderColor: "#2d3036", overflow: "hidden",
-  },
-  tableHeader: {
-    flexDirection: "row", backgroundColor: "#0f1115",
-    paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: "#2d3036",
-  },
-  tableHead: { fontSize: 8, fontWeight: "900", color: "#8a8d91", textTransform: "uppercase", letterSpacing: 1.5 },
-  tableRow: {
-    flexDirection: "row", alignItems: "center",
-    paddingHorizontal: 16, paddingVertical: 14,
-  },
-  tableCell: { fontSize: 10, fontWeight: "900", textTransform: "uppercase" },
-  statusBadge: {
-    backgroundColor: "rgba(34,197,94,0.1)", borderRadius: 20,
-    paddingHorizontal: 8, paddingVertical: 4,
-    borderWidth: 1, borderColor: "rgba(34,197,94,0.2)",
-  },
-  statusText: { fontSize: 7, fontWeight: "900", color: "#22c55e", letterSpacing: 1.5 },
-
-  exportBtn: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    backgroundColor: "#1c1e26", borderWidth: 1, borderColor: "#2d3036",
-    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8,
-  },
-  exportText: { fontSize: 8, fontWeight: "900", color: "#8a8d91" },
-});

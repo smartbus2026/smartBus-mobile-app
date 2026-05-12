@@ -1,13 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { 
+  View, Text, TextInput, TouchableOpacity, ScrollView, 
+  ActivityIndicator, KeyboardAvoidingView, Platform 
+} from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
-import { User, Phone, Hash, ShieldCheck, Lock, Eye, EyeOff, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react-native';
-import Api from '../../src/services/api'; // تأكدي من المسار
-import { RegisterPayload } from '../../src/types/index'; // تأكدي من المسار لملف الـ types
+import { 
+  User, Phone, Hash, ShieldCheck, Lock, 
+  Eye, EyeOff, CheckCircle, AlertCircle, ArrowLeft 
+} from 'lucide-react-native';
+import Api from '../../src/services/api'; 
+import { RegisterPayload } from '../../src/types/index'; 
 import { useRouter } from 'expo-router';
 import Appbar from '../../src/components/bar';
+import { useThemeColor } from '../../constants/theme'; // 🟢 استدعاء الهوك
 
 export default function CreateUserPage() {
+  const colors = useThemeColor(); // 🟢 سحب الألوان
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -34,7 +42,6 @@ export default function CreateUserPage() {
   }, [toast]);
 
   const onSubmit = async (data: any) => {
-    // Validation يدوي سريع
     if (!data.name || !data.email || !data.password) {
       setToast({ msg: 'Name, Email and Password are required', type: 'error' });
       return;
@@ -51,7 +58,7 @@ export default function CreateUserPage() {
         ...(data.role === 'student' ? { student_id: data.student_id } : {}),
       });
       
-      setToast({ msg: ' User added successfully', type: 'success' });
+      setToast({ msg: 'User added successfully', type: 'success' });
       setTimeout(() => router.back(), 1500);
     } catch (error: any) {
       setToast({ msg: error.response?.data?.message || 'Registration failed.', type: 'error' });
@@ -61,60 +68,104 @@ export default function CreateUserPage() {
   };
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1" style={{ backgroundColor: colors.background }}>
+      
+      {/* Toast */}
       {toast.msg && (
-        <View style={[styles.customToast, toast.type === 'success' ? styles.toastSuccess : styles.toastError]}>
-          {toast.type === 'success' ? <CheckCircle size={16} color="#22c55e" /> : <AlertCircle size={16} color="#ef4444" />}
-          <Text style={[styles.toastText, { color: toast.type === 'success' ? "#22c55e" : "#ef4444" }]}>{toast.msg}</Text>
+        <View 
+          className="absolute top-[60px] self-center z-50 flex-row items-center gap-2.5 py-3 px-5 rounded-full border shadow-lg"
+          style={{
+            backgroundColor: colors.card,
+            borderColor: toast.type === 'success' ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)",
+            shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15
+          }}
+        >
+          {toast.type === 'success' ? <CheckCircle size={16} color={colors.success || "#22c55e"} /> : <AlertCircle size={16} color={colors.error || "#ef4444"} />}
+          <Text 
+            className="text-[11px] font-black uppercase tracking-widest"
+            style={{ color: toast.type === 'success' ? (colors.success || "#22c55e") : (colors.error || "#ef4444") }}
+          >
+            {toast.msg}
+          </Text>
         </View>
       )}
 
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1">
+        <ScrollView 
+          contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 60, paddingBottom: 120 }} 
+          showsVerticalScrollIndicator={false}
+        >
           {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-              <ArrowLeft size={20} color="#fff" />
+          <View className="flex-row items-center gap-4 mb-8 mt-2">
+            <TouchableOpacity 
+              onPress={() => router.back()} 
+              className="w-10 h-10 rounded-xl items-center justify-center border"
+              style={{ backgroundColor: colors.card, borderColor: colors.border }}
+              activeOpacity={0.7}
+            >
+              <ArrowLeft size={20} color={colors.text} />
             </TouchableOpacity>
             <View>
-              <Text style={styles.headerTitle}>New <Text style={{ color: '#f7a01b' }}>Identity</Text></Text>
-              <Text style={styles.headerSubtitle}>Create a new system account</Text>
+              <Text className="text-[26px] font-black tracking-tight" style={{ color: colors.text }}>
+                New <Text style={{ color: colors.tint }}>Identity</Text>
+              </Text>
+              <Text className="text-[11px] font-bold uppercase mt-1" style={{ color: colors.icon }}>
+                Create a new system account
+              </Text>
             </View>
           </View>
 
           {/* Role Selection */}
-          <Text style={styles.sectionLabel}>Authority Level</Text>
-          <View style={styles.roleContainer}>
+          <Text className="text-[9px] font-black uppercase tracking-widest mb-3 ml-1" style={{ color: colors.icon }}>
+            Authority Level
+          </Text>
+          <View className="mb-6">
             <Controller
               control={control}
               name="role"
               render={({ field: { onChange, value } }) => (
-                <View style={styles.roleRow}>
-                  {['student', 'admin'].map((role) => (
-                    <TouchableOpacity
-                      key={role}
-                      style={[styles.roleOption, value === role && styles.roleActive]}
-                      onPress={() => onChange(role)}
-                    >
-                      <Text style={[styles.roleText, value === role && styles.roleTextActive]}>{role.toUpperCase()}</Text>
-                    </TouchableOpacity>
-                  ))}
+                <View 
+                  className="flex-row p-1 rounded-2xl border"
+                  style={{ backgroundColor: colors.card, borderColor: colors.border }}
+                >
+                  {['student', 'admin'].map((role) => {
+                    const isActive = value === role;
+                    return (
+                      <TouchableOpacity
+                        key={role}
+                        className="flex-1 py-3 items-center justify-center rounded-xl"
+                        style={{ backgroundColor: isActive ? colors.tint : "transparent" }}
+                        onPress={() => onChange(role)}
+                        activeOpacity={0.8}
+                      >
+                        <Text 
+                          className="text-[10px] font-black tracking-widest"
+                          style={{ color: isActive ? colors.background : colors.icon }}
+                        >
+                          {role.toUpperCase()}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               )}
             />
           </View>
 
-          {/* Form Fields */}
-          <View style={styles.card}>
+          {/* Form Fields Card */}
+          <View 
+            className="rounded-[28px] p-6 border shadow-sm"
+            style={{ backgroundColor: colors.card, borderColor: colors.border }}
+          >
             <CustomInput control={control} name="name" label="Full Name" placeholder="e.g. Ahmed Mohamed" icon={User} />
             <CustomInput control={control} name="email" label="Institutional Email" placeholder="name@university.edu" icon={ShieldCheck} />
 
-            <View style={styles.row}>
-              <View style={{ flex: 1 }}>
+            <View className="flex-row gap-3">
+              <View className="flex-1">
                 <CustomInput control={control} name="phone_number" label="Phone" placeholder="01xxxx" icon={Phone} />
               </View>
               {selectedRole === 'student' && (
-                <View style={{ flex: 1, marginLeft: 12 }}>
+                <View className="flex-1">
                   <CustomInput control={control} name="student_id" label="ID Number" placeholder="ID#" icon={Hash} />
                 </View>
               )}
@@ -128,15 +179,22 @@ export default function CreateUserPage() {
             />
             
             <TouchableOpacity 
-              style={[styles.submitBtn, loading && { opacity: 0.7 }]} 
+              className="h-[60px] rounded-[18px] items-center justify-center mt-3"
+              style={{ backgroundColor: colors.tint, opacity: loading ? 0.7 : 1 }}
               onPress={handleSubmit(onSubmit)}
               disabled={loading}
+              activeOpacity={0.8}
             >
-              {loading ? <ActivityIndicator color="#0f1115" /> : <Text style={styles.submitBtnText}>PROVISION ACCOUNT</Text>}
+              {loading ? (
+                <ActivityIndicator color={colors.background} />
+              ) : (
+                <Text className="text-[13px] font-black tracking-widest" style={{ color: colors.background }}>
+                  PROVISION ACCOUNT
+                </Text>
+              )}
             </TouchableOpacity>
           </View>
 
-          <View style={{ height: 120 }} />
         </ScrollView>
       </KeyboardAvoidingView>
       <Appbar />
@@ -144,65 +202,43 @@ export default function CreateUserPage() {
   );
 }
 
-const CustomInput = ({ control, name, label, placeholder, icon: Icon, secure, rightIcon: RightIcon, onRightIconPress }: any) => (
-  <View style={styles.inputGroup}>
-    <Text style={styles.fieldLabel}>{label}</Text>
-    <View style={styles.inputWrapper}>
-      <Icon size={16} color="#8a8d91" style={{ marginRight: 12 }} />
-      <Controller
-        control={control}
-        name={name}
-        render={({ field: { onChange, onBlur, value } }) => (
-          <TextInput
-            style={styles.input}
-            placeholder={placeholder}
-            placeholderTextColor="#4b4e5a"
-            secureTextEntry={secure}
-            onBlur={onBlur}
-            onChangeText={onChange}
-            value={value}
-            autoCapitalize="none"
-          />
+// 🟢 CustomInput Component (استخدمنا فيه نفس الهوك عشان يبقى لونه ديناميك)
+const CustomInput = ({ control, name, label, placeholder, icon: Icon, secure, rightIcon: RightIcon, onRightIconPress }: any) => {
+  const colors = useThemeColor(); // سحب الألوان جوه الكومبوننت الفرعي
+  
+  return (
+    <View className="mb-5">
+      <Text className="text-[9px] font-black uppercase tracking-widest mb-2 ml-1" style={{ color: colors.icon }}>
+        {label}
+      </Text>
+      <View 
+        className="flex-row items-center rounded-2xl px-4 h-14 border"
+        style={{ backgroundColor: colors.background, borderColor: colors.border }}
+      >
+        <Icon size={16} color={colors.icon} style={{ marginRight: 12 }} />
+        <Controller
+          control={control}
+          name={name}
+          render={({ field: { onChange, onBlur, value } }) => (
+            <TextInput
+              className="flex-1 text-[13px] font-bold"
+              style={{ color: colors.text }}
+              placeholder={placeholder}
+              placeholderTextColor={colors.icon}
+              secureTextEntry={secure}
+              onBlur={onBlur}
+              onChangeText={onChange}
+              value={value}
+              autoCapitalize="none"
+            />
+          )}
+        />
+        {RightIcon && (
+          <TouchableOpacity onPress={onRightIconPress} className="p-1">
+            <RightIcon size={16} color={colors.icon} />
+          </TouchableOpacity>
         )}
-      />
-      {RightIcon && (
-        <TouchableOpacity onPress={onRightIconPress}>
-          <RightIcon size={16} color="#8a8d91" />
-        </TouchableOpacity>
-      )}
+      </View>
     </View>
-  </View>
-);
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0f1115" },
-  scrollContent: { padding: 24 },
-  customToast: {
-    position: "absolute", top: 60, alignSelf: "center", zIndex: 1000,
-    flexDirection: "row", alignItems: "center", gap: 10,
-    paddingVertical: 12, paddingHorizontal: 20, borderRadius: 25,
-    borderWidth: 1, backgroundColor: "#1c1e26",
-  },
-  toastSuccess: { borderColor: "rgba(34,197,94,0.3)" },
-  toastError: { borderColor: "rgba(239,68,68,0.3)" },
-  toastText: { fontSize: 11, fontWeight: "900", textTransform: "uppercase", letterSpacing: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 15, marginBottom: 32, marginTop: 20 },
-  backBtn: { width: 40, height: 40, backgroundColor: '#1c1e26', borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#2d3036' },
-  headerTitle: { fontSize: 26, fontWeight: "900", color: "#fff" },
-  headerSubtitle: { fontSize: 11, fontWeight: "700", color: "#4b4e5a", textTransform: "uppercase", marginTop: 4 },
-  sectionLabel: { fontSize: 9, fontWeight: "900", color: "#4b4e5a", textTransform: "uppercase", letterSpacing: 2, marginBottom: 12 },
-  roleContainer: { marginBottom: 24 },
-  roleRow: { flexDirection: 'row', backgroundColor: '#1c1e26', padding: 4, borderRadius: 16, borderWidth: 1, borderColor: '#2d3036' },
-  roleOption: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 12 },
-  roleActive: { backgroundColor: '#f7a01b' },
-  roleText: { fontSize: 10, fontWeight: '900', color: '#8a8d91' },
-  roleTextActive: { color: '#0f1115' },
-  card: { backgroundColor: "#1c1e26", borderRadius: 28, padding: 24, borderWidth: 1, borderColor: "#2d3036" },
-  inputGroup: { marginBottom: 20 },
-  fieldLabel: { fontSize: 9, fontWeight: "900", color: "#8a8d91", textTransform: "uppercase", marginBottom: 8 },
-  inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: "#0f1115", borderRadius: 16, paddingHorizontal: 16, height: 56, borderWidth: 1, borderColor: "#2d3036" },
-  input: { flex: 1, color: "#fff", fontSize: 14, fontWeight: "600" },
-  row: { flexDirection: 'row', gap: 12 },
-  submitBtn: { backgroundColor: "#f7a01b", height: 60, borderRadius: 18, alignItems: "center", justifyContent: "center", marginTop: 10 },
-  submitBtnText: { fontSize: 13, fontWeight: "900", color: "#0f1115", letterSpacing: 1 }
-});
+  );
+};

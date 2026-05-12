@@ -3,7 +3,7 @@ import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 
 // غير ده بالـ IP بتاع جهازك
-export const BASE_URL = "http://192.168.1.9:5001/api";
+export const BASE_URL = "http://192.168.1.4:5001/api";
 
 const api = axios.create({
   baseURL: BASE_URL,

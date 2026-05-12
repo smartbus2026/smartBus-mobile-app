@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
-  ActivityIndicator, ScrollView, StyleSheet,
+  ActivityIndicator, ScrollView,
   Modal, KeyboardAvoidingView, Platform
 } from "react-native";
 import { 
   Plus, Calendar, Clock, Bus, 
-  Settings, X, Trash2, Edit2, Users
+  X, Trash2, Edit2, Users
 } from "lucide-react-native";
 import api from "../../src/services/api";
 import Appbar from "../../src/components/bar";
-
+import { useThemeColor } from "../../constants/theme"; // 🟢 استدعاء الهوك
 
 // --- Types ---
 interface TripData {
@@ -27,6 +27,7 @@ interface TripData {
 }
 
 export default function ManageTripsScreen() {
+  const colors = useThemeColor(); // 🟢 سحب الألوان
   const [trips, setTrips] = useState<TripData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | null }>({ msg: '', type: null });
@@ -51,7 +52,7 @@ export default function ManageTripsScreen() {
       const mappedTrips: TripData[] = rawTrips.map((t: any) => ({
         id: t._id,
         routeName: t.route?.name || 'Unknown Route',
-        date: t.date ? new Date(t.date).toLocaleDateString('en-GB') : 'N/A', // e.g. 12/05/2026
+        date: t.date ? new Date(t.date).toLocaleDateString('en-GB') : 'N/A', 
         timeSlot: departureTimeMap[t.time_slot] || t.time_slot,
         busNumber: t.bus_number || t.route?.code || 'Bus #01',
         bookedSeats: t.booked_seats || 0,
@@ -97,50 +98,64 @@ export default function ManageTripsScreen() {
   // Timeline UI Helpers
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return "#22c55e"; // Green
-      case 'completed': return "#f7a01b"; // Orange
-      case 'cancelled': return "#ef4444"; // Red
-      default: return "#3b82f6"; // Blue for Scheduled
+      case 'active': return colors.success || "#22c55e"; 
+      case 'completed': return colors.tint || "#f7a01b"; 
+      case 'cancelled': return colors.error || "#ef4444"; 
+      default: return "#3b82f6"; 
     }
   };
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1" style={{ backgroundColor: colors.background }}>
 
       {/* --- Toast --- */}
       {toast.msg ? (
-        <View style={[styles.toast, toast.type === 'success' ? styles.toastSuccess : styles.toastError]}>
-          <Text style={[styles.toastText, toast.type === 'success' ? {color: "#22c55e"} : {color: "#ef4444"}]}>
+        <View 
+          className="absolute top-15 self-center z-50 py-2.5 px-5 rounded-[20px] border"
+          style={{
+            backgroundColor: toast.type === 'success' ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
+            borderColor: toast.type === 'success' ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)"
+          }}
+        >
+          <Text 
+            className="text-[11px] font-extrabold uppercase tracking-widest"
+            style={{ color: toast.type === 'success' ? (colors.success || "#22c55e") : (colors.error || "#ef4444") }}
+          >
             {toast.msg}
           </Text>
         </View>
       ) : null}
 
       {/* --- Header --- */}
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
+      <View className="p-5 pt-15" style={{ backgroundColor: colors.background }}>
+        <View className="flex-row justify-between items-center">
           <View>
-            <Text style={styles.headerTitle}>Timeline</Text>
-            <Text style={styles.headerSubtitle}>Daily Fleet Operations</Text>
+            <Text className="text-[28px] font-black tracking-tighter" style={{ color: colors.text }}>Timeline</Text>
+            <Text className="text-[10px] font-extrabold uppercase tracking-widest mt-1" style={{ color: colors.icon }}>
+              Daily Fleet Operations
+            </Text>
           </View>
-          <TouchableOpacity style={styles.createBtn}>
-            <Plus size={18} color="#0f1115" />
+          <TouchableOpacity 
+            className="w-11 h-11 rounded-2xl items-center justify-center"
+            style={{ backgroundColor: colors.tint }}
+          >
+            <Plus size={18} color={colors.background} />
           </TouchableOpacity>
         </View>
       </View>
 
       {/* --- Main Content (Timeline) --- */}
       {isLoading ? (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#f7a01b" />
+        <View className="flex-1 justify-center items-center">
+          <ActivityIndicator size="large" color={colors.tint} />
         </View>
       ) : trips.length === 0 ? (
-        <View style={styles.centerContainer}>
-          <Clock size={40} color="#8a8d91" style={{ opacity: 0.3, marginBottom: 16 }} />
-          <Text style={styles.emptyText}>No schedules available.</Text>
+        <View className="flex-1 justify-center items-center">
+          <Clock size={40} color={colors.icon} style={{ opacity: 0.3, marginBottom: 16 }} />
+          <Text className="text-[13px] font-semibold" style={{ color: colors.icon }}>No schedules available.</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.timelineContainer} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100, paddingTop: 10 }} showsVerticalScrollIndicator={false}>
           {trips.map((trip, index) => {
             const statusColor = getStatusColor(trip.status);
             const fillPercentage = Math.min((trip.bookedSeats / trip.totalSeats) * 100, 100);
@@ -148,52 +163,73 @@ export default function ManageTripsScreen() {
             const isLast = index === trips.length - 1;
 
             return (
-              <View key={trip.id} style={styles.timelineRow}>
+              <View key={trip.id} className="flex-row min-h-[100px]">
                 
                 {/* 1. The Timeline Graphic (Left) */}
-                <View style={styles.timelineGraphic}>
-                  <View style={[styles.dotOuter, { borderColor: `${statusColor}40` }]}>
-                    <View style={[styles.dotInner, { backgroundColor: statusColor }]} />
+                <View className="w-10 items-center">
+                  <View 
+                    className="w-4 h-4 rounded-full border-2 items-center justify-center mt-1"
+                    style={{ borderColor: `${statusColor}40`, backgroundColor: colors.background }}
+                  >
+                    <View className="w-2 h-2 rounded-full" style={{ backgroundColor: statusColor }} />
                   </View>
-                  {!isLast && <View style={styles.line} />}
+                  {!isLast && <View className="flex-1 w-[2px] my-1" style={{ backgroundColor: colors.border }} />}
                 </View>
 
                 {/* 2. The Content Card (Right) */}
-                <View style={styles.cardContent}>
+                <View 
+                  className="flex-1 rounded-[20px] p-4 mb-5 border"
+                  style={{ backgroundColor: colors.card, borderColor: colors.border }}
+                >
                   
-                  <View style={styles.cardHeader}>
-                    <Text style={styles.timeText}>{trip.timeSlot}</Text>
-                    <View style={styles.actionIcons}>
-                      <TouchableOpacity style={styles.iconBtn} onPress={() => setEditingTrip(trip)}>
-                        <Edit2 size={14} color="#8a8d91" />
+                  <View className="flex-row justify-between items-center mb-2">
+                    <Text className="text-lg font-black tracking-tight" style={{ color: colors.text }}>{trip.timeSlot}</Text>
+                    <View className="flex-row gap-2">
+                      <TouchableOpacity 
+                        className="p-1.5 rounded-lg border"
+                        style={{ backgroundColor: colors.background, borderColor: colors.border }} 
+                        onPress={() => setEditingTrip(trip)}
+                      >
+                        <Edit2 size={14} color={colors.icon} />
                       </TouchableOpacity>
-                      <TouchableOpacity style={styles.iconBtn} onPress={() => setDeletingTripId(trip.id)}>
-                        <Trash2 size={14} color="#ef4444" />
+                      <TouchableOpacity 
+                        className="p-1.5 rounded-lg border"
+                        style={{ backgroundColor: colors.background, borderColor: colors.border }} 
+                        onPress={() => setDeletingTripId(trip.id)}
+                      >
+                        <Trash2 size={14} color={colors.error || "#ef4444"} />
                       </TouchableOpacity>
                     </View>
                   </View>
 
-                  <Text style={styles.routeName} numberOfLines={1}>{trip.routeName}</Text>
+                  <Text className="text-[13px] font-bold mb-4 tracking-wide" style={{ color: colors.icon }} numberOfLines={1}>
+                    {trip.routeName}
+                  </Text>
 
-                  <View style={styles.infoChips}>
-                    <View style={styles.chip}>
-                      <Calendar size={10} color="#8a8d91" />
-                      <Text style={styles.chipText}>{trip.date}</Text>
+                  <View className="flex-row gap-2 mb-4 flex-wrap">
+                    <View className="flex-row items-center gap-1.5 px-2.5 py-1.5 rounded-lg" style={{ backgroundColor: colors.background }}>
+                      <Calendar size={10} color={colors.icon} />
+                      <Text className="text-[10px] font-extrabold" style={{ color: colors.text }}>{trip.date}</Text>
                     </View>
-                    <View style={styles.chip}>
-                      <Bus size={10} color="#f7a01b" />
-                      <Text style={styles.chipText}>{trip.busNumber}</Text>
+                    <View className="flex-row items-center gap-1.5 px-2.5 py-1.5 rounded-lg" style={{ backgroundColor: colors.background }}>
+                      <Bus size={10} color={colors.tint} />
+                      <Text className="text-[10px] font-extrabold" style={{ color: colors.text }}>{trip.busNumber}</Text>
                     </View>
-                    <View style={styles.chip}>
-                      <Users size={10} color={isFull ? "#ef4444" : "#3b82f6"} />
-                      <Text style={[styles.chipText, isFull && {color: "#ef4444"}]}>
+                    <View className="flex-row items-center gap-1.5 px-2.5 py-1.5 rounded-lg" style={{ backgroundColor: colors.background }}>
+                      <Users size={10} color={isFull ? (colors.error || "#ef4444") : "#3b82f6"} />
+                      <Text className="text-[10px] font-extrabold" style={{ color: isFull ? (colors.error || "#ef4444") : colors.text }}>
                         {trip.bookedSeats}/{trip.totalSeats}
                       </Text>
                     </View>
                   </View>
 
-                  <View style={[styles.statusBadge, { backgroundColor: `${statusColor}15`, borderColor: `${statusColor}30` }]}>
-                    <Text style={[styles.statusText, { color: statusColor }]}>{trip.status}</Text>
+                  <View 
+                    className="self-start px-3 py-1.5 rounded-lg border"
+                    style={{ backgroundColor: `${statusColor}15`, borderColor: `${statusColor}30` }}
+                  >
+                    <Text className="text-[9px] font-black uppercase tracking-widest" style={{ color: statusColor }}>
+                      {trip.status}
+                    </Text>
                   </View>
 
                 </View>
@@ -216,21 +252,32 @@ export default function ManageTripsScreen() {
 
       {/* --- Delete Alert Modal --- */}
       <Modal visible={!!deletingTripId} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.alertModal}>
-            <View style={styles.alertIcon}>
-              <Trash2 size={24} color="#ef4444" />
+        <View className="flex-1 justify-center items-center p-5" style={{ backgroundColor: "rgba(0,0,0,0.7)" }}>
+          <View className="rounded-[28px] p-6 border items-center w-full max-w-[340px]" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
+            <View className="w-14 h-14 rounded-full items-center justify-center mb-4" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
+              <Trash2 size={24} color={colors.error || "#ef4444"} />
             </View>
-            <Text style={styles.alertTitle}>Delete Trip</Text>
-            <Text style={styles.alertMessage}>
+            <Text className="text-lg font-extrabold mb-2" style={{ color: colors.text }}>Delete Trip</Text>
+            <Text className="text-[13px] text-center leading-5 mb-6" style={{ color: colors.icon }}>
               Are you sure you want to delete this trip permanently?
             </Text>
-            <View style={styles.alertActions}>
-              <TouchableOpacity style={styles.alertCancelBtn} onPress={() => setDeletingTripId(null)}>
-                <Text style={styles.alertCancelText}>CANCEL</Text>
+            <View className="flex-row gap-3 w-full">
+              <TouchableOpacity 
+                className="flex-1 py-3.5 rounded-2xl items-center"
+                style={{ backgroundColor: colors.background }} 
+                onPress={() => setDeletingTripId(null)}
+              >
+                <Text className="text-[11px] font-extrabold tracking-widest" style={{ color: colors.icon }}>CANCEL</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.alertDeleteBtn} onPress={handleDeleteConfirm} disabled={isDeleting}>
-                <Text style={styles.alertDeleteText}>{isDeleting ? "..." : "DELETE"}</Text>
+              <TouchableOpacity 
+                className="flex-1 py-3.5 rounded-2xl items-center"
+                style={{ backgroundColor: colors.error || "#ef4444" }} 
+                onPress={handleDeleteConfirm} 
+                disabled={isDeleting}
+              >
+                <Text className="text-[11px] font-extrabold tracking-widest text-white">
+                  {isDeleting ? "..." : "DELETE"}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -246,6 +293,7 @@ export default function ManageTripsScreen() {
 // --- EDIT TRIP MODAL COMPONENT ---
 // ==========================================
 const EditTripModal = ({ trip, onClose, onSuccess }: any) => {
+  const colors = useThemeColor(); // 🟢 سحب الألوان للمودال كمان
   const [isSubmitting, setIsSubmitting] = useState(false);
   const formattedDate = trip.rawDate ? new Date(trip.rawDate).toISOString().split('T')[0] : '';
   
@@ -273,29 +321,30 @@ const EditTripModal = ({ trip, onClose, onSuccess }: any) => {
 
   return (
     <Modal transparent animationType="slide" visible={true}>
-      <View style={styles.modalOverlayFlexEnd}>
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.bottomSheet}>
+      <View className="flex-1 justify-end" style={{ backgroundColor: "rgba(0,0,0,0.7)" }}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} className="rounded-t-[32px] max-h-[85%]" style={{ backgroundColor: colors.card }}>
           
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Edit Trip Details</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <X size={20} color="#fff" />
+          <View className="flex-row justify-between items-center p-6 border-b" style={{ borderBottomColor: colors.border }}>
+            <Text className="text-lg font-extrabold" style={{ color: colors.text }}>Edit Trip Details</Text>
+            <TouchableOpacity onPress={onClose} className="p-2 rounded-xl" style={{ backgroundColor: colors.background }}>
+              <X size={20} color={colors.text} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.sheetBody} showsVerticalScrollIndicator={false}>
-            <Text style={styles.routeHeader}>{trip.routeName}</Text>
+          <ScrollView className="p-6" showsVerticalScrollIndicator={false}>
+            <Text className="text-[15px] font-black mb-5" style={{ color: colors.tint }}>{trip.routeName}</Text>
             
-            <Text style={styles.inputLabel}>TRIP DATE (YYYY-MM-DD)</Text>
+            <Text className="text-[10px] font-extrabold tracking-widest mb-2 mt-4" style={{ color: colors.icon }}>TRIP DATE (YYYY-MM-DD)</Text>
             <TextInput 
-              style={styles.input} 
+              className="border rounded-2xl p-4 text-sm"
+              style={{ backgroundColor: colors.background, borderColor: colors.border, color: colors.text }}
               value={formData.date} 
               onChangeText={t => setFormData({...formData, date: t})}
-              placeholderTextColor="#8a8d91"
+              placeholderTextColor={colors.icon}
             />
 
-            <Text style={styles.inputLabel}>TIME SLOT</Text>
-            <View style={styles.slotContainer}>
+            <Text className="text-[10px] font-extrabold tracking-widest mb-2 mt-4" style={{ color: colors.icon }}>TIME SLOT</Text>
+            <View className="flex-row gap-2">
               {[
                 { id: "morning", label: "Morning" },
                 { id: "return_1530", label: "03:30 PM" },
@@ -303,42 +352,56 @@ const EditTripModal = ({ trip, onClose, onSuccess }: any) => {
               ].map((slot) => (
                 <TouchableOpacity
                   key={slot.id}
-                  style={[styles.slotBtn, formData.time_slot === slot.id && styles.slotBtnActive]}
+                  className="flex-1 flex-row items-center justify-center gap-2 border py-3.5 rounded-2xl"
+                  style={{ 
+                    backgroundColor: formData.time_slot === slot.id ? `${colors.tint}0D` : colors.background,
+                    borderColor: formData.time_slot === slot.id ? colors.tint : colors.border
+                  }}
                   onPress={() => setFormData({...formData, time_slot: slot.id})}
                 >
-                  <Text style={[styles.slotText, formData.time_slot === slot.id && styles.slotTextActive]}>
+                  <Text 
+                    className="text-[11px] font-extrabold" 
+                    style={{ color: formData.time_slot === slot.id ? colors.tint : colors.icon }}
+                  >
                     {slot.label}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <View style={{ flexDirection: "row", gap: 12 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.inputLabel}>BUS NUMBER</Text>
+            <View className="flex-row gap-3">
+              <View className="flex-1">
+                <Text className="text-[10px] font-extrabold tracking-widest mb-2 mt-4" style={{ color: colors.icon }}>BUS NUMBER</Text>
                 <TextInput 
-                  style={styles.input} 
+                  className="border rounded-2xl p-4 text-sm"
+                  style={{ backgroundColor: colors.background, borderColor: colors.border, color: colors.text }}
                   value={formData.bus_number} 
                   onChangeText={t => setFormData({...formData, bus_number: t})}
                 />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.inputLabel}>TOTAL SEATS</Text>
+              <View className="flex-1">
+                <Text className="text-[10px] font-extrabold tracking-widest mb-2 mt-4" style={{ color: colors.icon }}>TOTAL SEATS</Text>
                 <TextInput 
-                  style={styles.input} 
+                  className="border rounded-2xl p-4 text-sm"
+                  style={{ backgroundColor: colors.background, borderColor: colors.border, color: colors.text }}
                   keyboardType="numeric"
                   value={formData.total_seats} 
                   onChangeText={t => setFormData({...formData, total_seats: t})}
                 />
               </View>
-                 
-
             </View>
           </ScrollView>
 
-          <View style={styles.sheetFooter}>
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSubmit} disabled={isSubmitting}>
-              <Text style={styles.saveBtnText}>{isSubmitting ? "SAVING..." : "SAVE CHANGES"}</Text>
+          <View className="p-6 border-t" style={{ borderTopColor: colors.border, paddingBottom: Platform.OS === 'ios' ? 40 : 24 }}>
+            <TouchableOpacity 
+              className="py-4 rounded-2xl items-center"
+              style={{ backgroundColor: colors.tint }} 
+              onPress={handleSubmit} 
+              disabled={isSubmitting}
+            >
+              <Text className="text-[13px] font-extrabold tracking-widest" style={{ color: colors.background }}>
+                {isSubmitting ? "SAVING..." : "SAVE CHANGES"}
+              </Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -348,87 +411,3 @@ const EditTripModal = ({ trip, onClose, onSuccess }: any) => {
     </Modal>
   );
 };
-
-// ==========================================
-// --- STYLES ---
-// ==========================================
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0f1115" },
-  
-  // Toast
-  toast: { position: "absolute", top: 60, alignSelf: "center", zIndex: 100, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1 },
-  toastSuccess: { backgroundColor: "rgba(34,197,94,0.1)", borderColor: "rgba(34,197,94,0.3)" },
-  toastError: { backgroundColor: "rgba(239,68,68,0.1)", borderColor: "rgba(239,68,68,0.3)" },
-  toastText: { fontSize: 11, fontWeight: "800", textTransform: "uppercase", letterSpacing: 1 },
-
-  // Header
-  header: { padding: 20, paddingTop: 60, backgroundColor: "#0f1115" },
-  headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  headerTitle: { fontSize: 28, fontWeight: "900", color: "#fff", letterSpacing: -0.5 },
-  headerSubtitle: { fontSize: 10, fontWeight: "800", color: "#8a8d91", textTransform: "uppercase", letterSpacing: 2, marginTop: 4 },
-  createBtn: { width: 44, height: 44, borderRadius: 16, backgroundColor: "#f7a01b", alignItems: "center", justifyContent: "center" },
-  
-  centerContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyText: { color: "#6b7280", fontSize: 13, fontWeight: "600" },
-
-  // --- Timeline Layout ---
-  timelineContainer: { paddingHorizontal: 20, paddingBottom: 100, paddingTop: 10 },
-  timelineRow: { flexDirection: "row", minHeight: 100 },
-  
-  timelineGraphic: { width: 40, alignItems: "center" },
-  dotOuter: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, alignItems: "center", justifyContent: "center", backgroundColor: "#0f1115", marginTop: 4 },
-  dotInner: { width: 8, height: 8, borderRadius: 4 },
-  line: { flex: 1, width: 2, backgroundColor: "#2d3036", marginVertical: 4 },
-
-  cardContent: { flex: 1, backgroundColor: "#1c1e26", borderRadius: 20, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: "#2d3036" },
-  
-  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
-  timeText: { fontSize: 18, fontWeight: "900", color: "#fff", letterSpacing: -0.5 },
-  actionIcons: { flexDirection: "row", gap: 8 },
-  iconBtn: { padding: 6, backgroundColor: "#0f1115", borderRadius: 8, borderWidth: 1, borderColor: "#2d3036" },
-  
-  routeName: { fontSize: 13, fontWeight: "700", color: "#8a8d91", marginBottom: 16, letterSpacing: 0.5 },
-  
-  infoChips: { flexDirection: "row", gap: 8, marginBottom: 16, flexWrap: "wrap" },
-  chip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#0f1115", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
-  chipText: { fontSize: 10, fontWeight: "800", color: "#fff" },
-
-  statusBadge: { alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
-  statusText: { fontSize: 9, fontWeight: "900", textTransform: "uppercase", letterSpacing: 1.5 },
-
-  // Modals Overlay
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", padding: 20 },
-  modalOverlayFlexEnd: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" },
-
-  // Bottom Sheet Form
-  bottomSheet: { backgroundColor: "#1c1e26", borderTopLeftRadius: 32, borderTopRightRadius: 32, maxHeight: "85%" },
-  sheetHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 24, borderBottomWidth: 1, borderBottomColor: "#2d3036" },
-  sheetTitle: { fontSize: 18, fontWeight: "800", color: "#fff" },
-  closeBtn: { backgroundColor: "#262a33", padding: 8, borderRadius: 12 },
-  
-  sheetBody: { padding: 24 },
-  routeHeader: { fontSize: 15, fontWeight: "900", color: "#f7a01b", marginBottom: 20 },
-  inputLabel: { fontSize: 10, fontWeight: "800", color: "#8a8d91", letterSpacing: 1, marginBottom: 8, marginTop: 16 },
-  input: { backgroundColor: "#0f1115", borderWidth: 1, borderColor: "#2d3036", borderRadius: 16, color: "#fff", padding: 16, fontSize: 14 },
-  
-  slotContainer: { flexDirection: "row", gap: 8 },
-  slotBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#0f1115", borderWidth: 1, borderColor: "#2d3036", paddingVertical: 14, borderRadius: 14 },
-  slotBtnActive: { borderColor: "#f7a01b", backgroundColor: "rgba(247,160,27,0.05)" },
-  slotText: { fontSize: 11, fontWeight: "800", color: "#8a8d91" },
-  slotTextActive: { color: "#f7a01b" },
-
-  sheetFooter: { padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24, borderTopWidth: 1, borderTopColor: "#2d3036" },
-  saveBtn: { backgroundColor: "#f7a01b", paddingVertical: 18, borderRadius: 16, alignItems: "center" },
-  saveBtnText: { color: "#0f1115", fontSize: 13, fontWeight: "800", letterSpacing: 1 },
-
-  // Alert Modal
-  alertModal: { backgroundColor: "#1c1e26", borderRadius: 28, padding: 24, borderWidth: 1, borderColor: "#2d3036", alignItems: "center" },
-  alertIcon: { width: 56, height: 56, borderRadius: 28, backgroundColor: "rgba(239,68,68,0.1)", alignItems: "center", justifyContent: "center", marginBottom: 16 },
-  alertTitle: { fontSize: 18, fontWeight: "800", color: "#fff", marginBottom: 8 },
-  alertMessage: { fontSize: 13, color: "#8a8d91", textAlign: "center", lineHeight: 20, marginBottom: 24 },
-  alertActions: { flexDirection: "row", gap: 12, width: "100%" },
-  alertCancelBtn: { flex: 1, backgroundColor: "#262a33", paddingVertical: 14, borderRadius: 14, alignItems: "center" },
-  alertCancelText: { color: "#8a8d91", fontSize: 11, fontWeight: "800", letterSpacing: 1 },
-  alertDeleteBtn: { flex: 1, backgroundColor: "#ef4444", paddingVertical: 14, borderRadius: 14, alignItems: "center" },
-  alertDeleteText: { color: "#fff", fontSize: 11, fontWeight: "800", letterSpacing: 1 },
-});

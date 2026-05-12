@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
   ActivityIndicator, KeyboardAvoidingView,
-  Platform, ScrollView, StyleSheet, Modal
+  Platform, ScrollView, Modal
 } from "react-native";
 import { router } from "expo-router";
 import { useForm, Controller } from "react-hook-form";
@@ -10,8 +10,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { MapPin, Bus, Calendar, Users, ArrowLeft, CheckCircle, Clock, ChevronDown } from "lucide-react-native";
 import api from "../../src/services/api";
-import Appbar from "../../src/components/bar";
-
+import { useThemeColor } from "../../constants/theme"; // 🟢 استدعاء الهوك
 
 // 1. التعديل عشان يطابق الويبسايت (route_id بدلاً من route)
 const tripSchema = z.object({
@@ -30,11 +29,12 @@ interface RouteOption {
 }
 
 export default function CreateTripScreen() {
+  const colors = useThemeColor(); // 🟢 سحب الألوان
   const [loading, setLoading] = useState(false);
   const [routesLoading, setRoutesLoading] = useState(true);
   const [routes, setRoutes] = useState<RouteOption[]>([]);
   
-  // للـ Dropdown Custom Modal عشان مفيش select صريح في React Native
+  // للـ Dropdown Custom Modal
   const [routeModalVisible, setRouteModalVisible] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -52,7 +52,6 @@ export default function CreateTripScreen() {
   // عشان نظهر اسم المسار بدل الـ ID
   const selectedRouteName = routes.find(r => r._id === selectedRouteId)?.name || "Select a route";
 
-  // جلب المسارات زي الويبسايت بالظبط
   useEffect(() => {
     const fetchRoutes = async () => {
       try {
@@ -73,7 +72,6 @@ export default function CreateTripScreen() {
     setSuccess(false);
 
     try {
-      // تجهيز الداتا زي الويبسايت بالظبط
       const payload = {
         route_id: data.route_id,
         departure_time: data.departure_time,
@@ -100,54 +98,72 @@ export default function CreateTripScreen() {
   };
 
   return (
-   
-      
     <KeyboardAvoidingView
-      style={styles.container}
+      className="flex-1"
+      style={{ backgroundColor: colors.background }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <ArrowLeft size={24} color="#fff" />
+      <View 
+        className="flex-row items-center justify-between px-5 pt-[60px] pb-5 border-b"
+        style={{ backgroundColor: colors.card, borderBottomColor: colors.border }}
+      >
+        <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2" activeOpacity={0.7}>
+          <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Create Trip</Text>
-        <View style={{ width: 24 }} /> 
+        <Text className="text-lg font-black tracking-wide" style={{ color: colors.text }}>Create Trip</Text>
+        <View className="w-10" /> 
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 24, paddingBottom: 60 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         
-        <View style={styles.card}>
-          <Text style={styles.cardSubtitle}>Deploy new fleet schedules</Text>
+        <View 
+          className="rounded-[32px] p-7 border shadow-sm"
+          style={{ backgroundColor: colors.card, borderColor: colors.border }}
+        >
+          <Text className="text-[11px] font-semibold text-center uppercase tracking-widest mb-6" style={{ color: colors.icon }}>
+            Deploy new fleet schedules
+          </Text>
 
           {/* Alert Messages */}
           {serverError && (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{serverError}</Text>
+            <View 
+              className="rounded-xl p-3 mb-4 border"
+              style={{ backgroundColor: "rgba(239,68,68,0.1)", borderColor: "rgba(239,68,68,0.2)" }}
+            >
+              <Text className="text-xs text-center" style={{ color: colors.error || "#ef4444" }}>{serverError}</Text>
             </View>
           )}
           {success && (
-            <View style={styles.successBox}>
-              <CheckCircle size={16} color="#22c55e" style={{ marginRight: 6 }} />
-              <Text style={styles.successText}>Trip Created Successfully!</Text>
+            <View 
+              className="flex-row justify-center items-center rounded-xl p-3 mb-4 border"
+              style={{ backgroundColor: "rgba(34,197,94,0.1)", borderColor: "rgba(34,197,94,0.2)" }}
+            >
+              <CheckCircle size={16} color={colors.success || "#22c55e"} style={{ marginRight: 6 }} />
+              <Text className="text-xs font-bold" style={{ color: colors.success || "#22c55e" }}>Trip Created Successfully!</Text>
             </View>
           )}
 
-          {/* حقل: Route ID (Custom Dropdown) */}
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>SELECT ROUTE</Text>
+          {/* Field: Route ID */}
+          <View className="mb-4">
+            <Text className="text-[10px] font-black uppercase tracking-widest mb-1.5 ml-1" style={{ color: colors.icon }}>SELECT ROUTE</Text>
             <TouchableOpacity 
-              style={[styles.inputWrapper, { paddingVertical: 14, paddingHorizontal: 10 }, errors.route_id && styles.inputError]}
+              className="flex-row items-center rounded-2xl px-3 py-3.5 border"
+              style={{ 
+                backgroundColor: colors.background, 
+                borderColor: errors.route_id ? (colors.error || "#ef4444") : colors.border 
+              }}
               onPress={() => setRouteModalVisible(true)}
               disabled={routesLoading}
+              activeOpacity={0.7}
             >
-              <MapPin size={18} color="#8a8d91" style={styles.inputIcon} />
-              <Text style={[styles.input, { color: selectedRouteId ? "#fff" : "#3a3d42", flex: 1, marginLeft: 10 }]}>
+              <MapPin size={18} color={colors.icon} style={{ marginLeft: 4 }} />
+              <Text className="flex-1 text-[13px] font-bold ml-2.5" style={{ color: selectedRouteId ? colors.text : colors.icon }}>
                 {routesLoading ? "Loading routes..." : selectedRouteName}
               </Text>
-              <ChevronDown size={18} color="#8a8d91" style={{ marginRight: 10 }} />
+              <ChevronDown size={18} color={colors.icon} style={{ marginRight: 4 }} />
             </TouchableOpacity>
-            {errors.route_id && <Text style={styles.fieldError}>{errors.route_id.message}</Text>}
+            {errors.route_id && <Text className="text-[10px] font-medium mt-1 ml-1" style={{ color: colors.error || "#ef4444" }}>{errors.route_id.message}</Text>}
           </View>
 
           {/* Route Selection Modal */}
@@ -157,43 +173,59 @@ export default function CreateTripScreen() {
             animationType="slide"
             onRequestClose={() => setRouteModalVisible(false)}
           >
-            <View style={styles.modalOverlay}>
-              <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>Select Route</Text>
-                <ScrollView>
+            <View className="flex-1 justify-end" style={{ backgroundColor: "rgba(0,0,0,0.7)" }}>
+              <View className="rounded-t-[32px] max-h-[70%] border-t" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
+                <View className="p-6 border-b" style={{ borderBottomColor: colors.border }}>
+                  <Text className="text-lg font-black text-center" style={{ color: colors.text }}>Select Route</Text>
+                </View>
+                <ScrollView showsVerticalScrollIndicator={false}>
                   {routes.map((r) => (
                     <TouchableOpacity
                       key={r._id}
-                      style={styles.modalOption}
+                      className="py-4 px-6 border-b"
+                      style={{ borderBottomColor: colors.border }}
                       onPress={() => {
                         setValue("route_id", r._id, { shouldValidate: true });
                         setRouteModalVisible(false);
                       }}
                     >
-                      <Text style={styles.modalOptionText}>{r.name}</Text>
+                      <Text className="textsm font-bold" style={{ color: colors.text }}>{r.name}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
-                <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setRouteModalVisible(false)}>
-                  <Text style={styles.modalCloseText}>CANCEL</Text>
-                </TouchableOpacity>
+                <View className="p-6 pb-8">
+                  <TouchableOpacity 
+                    className="py-3.5 items-center rounded-xl"
+                    style={{ backgroundColor: colors.background }}
+                    onPress={() => setRouteModalVisible(false)}
+                  >
+                    <Text className="text-xs font-black tracking-widest" style={{ color: colors.icon }}>CANCEL</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           </Modal>
 
-          {/* حقل: Trip Date */}
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>TRIP DATE (YYYY-MM-DD)</Text>
-            <View style={[styles.inputWrapper, errors.departure_time && styles.inputError]}>
-              <Calendar size={18} color="#8a8d91" style={styles.inputIcon} />
+          {/* Field: Trip Date */}
+          <View className="mb-4">
+            <Text className="text-[10px] font-black uppercase tracking-widest mb-1.5 ml-1" style={{ color: colors.icon }}>TRIP DATE (YYYY-MM-DD)</Text>
+            <View 
+              className="flex-row items-center rounded-2xl px-3 border"
+              style={{ 
+                backgroundColor: colors.background, 
+                borderColor: errors.departure_time ? (colors.error || "#ef4444") : colors.border 
+              }}
+            >
+              <Calendar size={18} color={colors.icon} style={{ marginLeft: 4 }} />
               <Controller
                 control={control}
                 name="departure_time"
                 render={({ field: { onChange, value } }) => (
                   <TextInput
-                    style={styles.input}
+                    className="flex-1 text-[13px] font-bold p-4"
+                    style={{ color: colors.text }}
                     placeholder="e.g. 2026-05-12"
-                    placeholderTextColor="#3a3d42"
+                    placeholderTextColor={colors.icon}
                     value={value}
                     onChangeText={onChange}
                     editable={!loading}
@@ -201,46 +233,61 @@ export default function CreateTripScreen() {
                 )}
               />
             </View>
-            {errors.departure_time && <Text style={styles.fieldError}>{errors.departure_time.message}</Text>}
+            {errors.departure_time && <Text className="text-[10px] font-medium mt-1 ml-1" style={{ color: colors.error || "#ef4444" }}>{errors.departure_time.message}</Text>}
           </View>
 
-          {/* حقل: Time Slot (أزرار اختيار) */}
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>TIME SLOT</Text>
-            <View style={styles.slotContainer}>
+          {/* Field: Time Slot */}
+          <View className="mb-4">
+            <Text className="text-[10px] font-black uppercase tracking-widest mb-1.5 ml-1" style={{ color: colors.icon }}>TIME SLOT</Text>
+            <View className="flex-row gap-2">
               {[
                 { id: "morning", label: "Morning" },
                 { id: "return_1530", label: "03:30 PM" },
                 { id: "return_1900", label: "07:00 PM" }
-              ].map((slot) => (
-                <TouchableOpacity
-                  key={slot.id}
-                  style={[styles.slotBtn, selectedTimeSlot === slot.id && styles.slotBtnActive]}
-                  onPress={() => setValue("time_slot", slot.id as any)}
-                >
-                  <Clock size={14} color={selectedTimeSlot === slot.id ? "#0f1115" : "#8a8d91"} />
-                  <Text style={[styles.slotText, selectedTimeSlot === slot.id && styles.slotTextActive]}>
-                    {slot.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              ].map((slot) => {
+                const isActive = selectedTimeSlot === slot.id;
+                return (
+                  <TouchableOpacity
+                    key={slot.id}
+                    className="flex-1 flex-row items-center justify-center gap-1.5 border py-3.5 rounded-xl"
+                    style={{ 
+                      backgroundColor: isActive ? `${colors.tint}1A` : colors.background, 
+                      borderColor: isActive ? colors.tint : colors.border 
+                    }}
+                    onPress={() => setValue("time_slot", slot.id as any)}
+                    activeOpacity={0.7}
+                  >
+                    <Clock size={12} color={isActive ? colors.tint : colors.icon} />
+                    <Text className="text-[10px] font-black tracking-widest" style={{ color: isActive ? colors.tint : colors.icon }}>
+                      {slot.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
 
-          {/* حقل: رقم الباص و السعة */}
-          <View style={styles.row}>
-            <View style={[styles.fieldGroup, { flex: 1.5 }]}>
-              <Text style={styles.label}>BUS NUMBER</Text>
-              <View style={[styles.inputWrapper, errors.bus_number && styles.inputError]}>
-                <Bus size={18} color="#8a8d91" style={styles.inputIcon} />
+          {/* Fields: Bus Number & Total Seats */}
+          <View className="flex-row gap-3 mb-2">
+            <View className="flex-[1.5]">
+              <Text className="text-[10px] font-black uppercase tracking-widest mb-1.5 ml-1" style={{ color: colors.icon }}>BUS NUMBER</Text>
+              <View 
+                className="flex-row items-center rounded-2xl px-3 border"
+                style={{ 
+                  backgroundColor: colors.background, 
+                  borderColor: errors.bus_number ? (colors.error || "#ef4444") : colors.border 
+                }}
+              >
+                <Bus size={18} color={colors.icon} style={{ marginLeft: 4 }} />
                 <Controller
                   control={control}
                   name="bus_number"
                   render={({ field: { onChange, value } }) => (
                     <TextInput
-                      style={styles.input}
+                      className="flex-1 text-[13px] font-bold p-4"
+                      style={{ color: colors.text }}
                       placeholder="e.g. Bus 101"
-                      placeholderTextColor="#3a3d42"
+                      placeholderTextColor={colors.icon}
                       value={value}
                       onChangeText={onChange}
                       editable={!loading}
@@ -248,23 +295,28 @@ export default function CreateTripScreen() {
                   )}
                 />
               </View>
-              {errors.bus_number && <Text style={styles.fieldError}>{errors.bus_number.message}</Text>}
+              {errors.bus_number && <Text className="text-[10px] font-medium mt-1 ml-1" style={{ color: colors.error || "#ef4444" }}>{errors.bus_number.message}</Text>}
             </View>
 
-            <View style={{ width: 12 }} />
-
-            <View style={[styles.fieldGroup, { flex: 1 }]}>
-              <Text style={styles.label}>TOTAL SEATS</Text>
-              <View style={[styles.inputWrapper, errors.total_seats && styles.inputError]}>
-                <Users size={18} color="#8a8d91" style={styles.inputIcon} />
+            <View className="flex-1">
+              <Text className="text-[10px] font-black uppercase tracking-widest mb-1.5 ml-1" style={{ color: colors.icon }}>TOTAL SEATS</Text>
+              <View 
+                className="flex-row items-center rounded-2xl px-3 border"
+                style={{ 
+                  backgroundColor: colors.background, 
+                  borderColor: errors.total_seats ? (colors.error || "#ef4444") : colors.border 
+                }}
+              >
+                <Users size={18} color={colors.icon} style={{ marginLeft: 4 }} />
                 <Controller
                   control={control}
                   name="total_seats"
                   render={({ field: { onChange, value } }) => (
                     <TextInput
-                      style={styles.input}
+                      className="flex-1 text-[13px] font-bold p-4"
+                      style={{ color: colors.text }}
                       placeholder="40"
-                      placeholderTextColor="#3a3d42"
+                      placeholderTextColor={colors.icon}
                       keyboardType="numeric"
                       value={value}
                       onChangeText={onChange}
@@ -273,116 +325,30 @@ export default function CreateTripScreen() {
                   )}
                 />
               </View>
-              {errors.total_seats && <Text style={styles.fieldError}>{errors.total_seats.message}</Text>}
+              {errors.total_seats && <Text className="text-[10px] font-medium mt-1 ml-1" style={{ color: colors.error || "#ef4444" }}>{errors.total_seats.message}</Text>}
             </View>
           </View>
 
-          {/* زرار الإرسال */}
+          {/* Submit Button */}
           <TouchableOpacity
-            style={[styles.submitBtn, loading && styles.submitDisabled]}
+            className="rounded-2xl py-[18px] items-center mt-5"
+            style={{ backgroundColor: colors.tint, opacity: loading ? 0.7 : 1 }}
             onPress={handleSubmit(onSubmit)}
             disabled={loading}
-            activeOpacity={0.85}
+            activeOpacity={0.8}
           >
             {loading ? (
-              <ActivityIndicator color="#0f1115" />
+              <ActivityIndicator color={colors.background} />
             ) : (
-              <Text style={styles.submitText}>Create Schedule</Text>
+              <Text className="text-[13px] font-black tracking-widest uppercase" style={{ color: colors.background }}>
+                Create Schedule
+              </Text>
             )}
           </TouchableOpacity>
 
         </View>
 
       </ScrollView>
-      
     </KeyboardAvoidingView>
-
-    
-    
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0f1115" },
-  header: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 20, paddingTop: 50, paddingBottom: 20,
-    backgroundColor: "#1c1e26", borderBottomWidth: 1, borderBottomColor: "#2d3036",
-  },
-  backBtn: { padding: 8, marginLeft: -8 },
-  headerTitle: { fontSize: 18, fontWeight: "800", color: "#fff", letterSpacing: 0.5 },
-  
-  scroll: { flexGrow: 1, padding: 24, paddingBottom: 60 },
-  card: {
-    backgroundColor: "#1c1e26", borderWidth: 1,
-    borderColor: "#2d3036", borderRadius: 32, padding: 28,
-  },
-  cardSubtitle: { fontSize: 11, color: "#8a8d91", marginBottom: 24, textAlign: "center", fontWeight: "600", textTransform: "uppercase", letterSpacing: 2 },
-
-  errorBox: {
-    backgroundColor: "rgba(239,68,68,0.1)", borderWidth: 1,
-    borderColor: "rgba(239,68,68,0.2)", borderRadius: 12,
-    padding: 12, marginBottom: 16,
-  },
-  errorText: { color: "#f87171", fontSize: 12, textAlign: "center" },
-  
-  successBox: {
-    flexDirection: "row", justifyContent: "center", alignItems: "center",
-    backgroundColor: "rgba(34,197,94,0.1)", borderWidth: 1,
-    borderColor: "rgba(34,197,94,0.2)", borderRadius: 12,
-    padding: 12, marginBottom: 16,
-  },
-  successText: { color: "#22c55e", fontSize: 12, fontWeight: "700" },
-
-  fieldGroup: { marginBottom: 16 },
-  row: { flexDirection: "row", alignItems: "flex-start" },
-  label: { fontSize: 10, color: "#8a8d91", fontWeight: "700", letterSpacing: 1.5, marginBottom: 6, marginLeft: 4, textTransform: "uppercase" },
-  
-  inputWrapper: {
-    flexDirection: "row", alignItems: "center",
-    backgroundColor: "#262a33", borderWidth: 1,
-    borderColor: "#2d3036", borderRadius: 14,
-  },
-  inputError: { borderColor: "rgba(239,68,68,0.5)" },
-  inputIcon: { marginLeft: 14 },
-  input: { flex: 1, color: "#fff", fontSize: 14, paddingVertical: 14, paddingHorizontal: 10 },
-  fieldError: { color: "#f87171", fontSize: 10, marginTop: 4, marginLeft: 4, fontWeight: "500" },
-
-  slotContainer: { flexDirection: "row", gap: 8 },
-  slotBtn: {
-    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-    backgroundColor: "#262a33", borderWidth: 1, borderColor: "#2d3036",
-    paddingVertical: 12, borderRadius: 12,
-  },
-  slotBtnActive: { backgroundColor: "#f7a01b", borderColor: "#f7a01b" },
-  slotText: { color: "#8a8d91", fontSize: 11, fontWeight: "700" },
-  slotTextActive: { color: "#0f1115", fontWeight: "900" },
-
-  submitBtn: {
-    backgroundColor: "#f7a01b", borderRadius: 16,
-    paddingVertical: 16, alignItems: "center", marginTop: 12,
-  },
-  submitDisabled: { opacity: 0.7 },
-  submitText: { color: "#0f1115", fontSize: 14, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase" },
-
-  // Modal Styles
-  modalOverlay: {
-    flex: 1, backgroundColor: "rgba(15,17,21,0.8)",
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    backgroundColor: "#1c1e26", borderTopLeftRadius: 32, borderTopRightRadius: 32,
-    padding: 24, maxHeight: "70%",
-    borderTopWidth: 1, borderColor: "#2d3036",
-  },
-  modalTitle: { fontSize: 16, fontWeight: "900", color: "#fff", marginBottom: 16, textAlign: "center" },
-  modalOption: {
-    paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: "#2d3036",
-  },
-  modalOptionText: { fontSize: 14, color: "#fff", fontWeight: "600" },
-  modalCloseBtn: {
-    marginTop: 16, paddingVertical: 14, alignItems: "center",
-    backgroundColor: "#262a33", borderRadius: 12,
-  },
-  modalCloseText: { color: "#8a8d91", fontSize: 12, fontWeight: "800", letterSpacing: 1 },
-});
