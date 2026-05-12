@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity } from "react-native";
 import { Drawer } from "expo-router/drawer";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
@@ -8,6 +8,9 @@ import {
 import { DrawerContentScrollView } from "@react-navigation/drawer";
 import { router } from "expo-router";
 import { useAuth } from "../../src/context/AuthContext";
+// ضفنا الاستدعاء بتاع البار هنا
+import Appbar from "../../src/components/bar"; 
+import { useThemeColor } from "../../constants/theme"; // 🟢 استدعاء الهوك
 
 const ADMIN_NAV = [
   { name: "dashboard",     label: "Dashboard",        icon: LayoutGrid },
@@ -23,6 +26,7 @@ const ADMIN_NAV = [
 ];
 
 function AdminDrawerContent(props: any) {
+  const colors = useThemeColor(); // 🟢 سحب الألوان
   const { logout } = useAuth();
   const current = props.state?.routeNames[props.state?.index];
 
@@ -32,23 +36,37 @@ function AdminDrawerContent(props: any) {
   };
 
   return (
-    <View style={styles.drawer}>
-      <View style={styles.drawerLogo}>
-        <View style={styles.logoBox}>
-          <Bus size={20} color="#fff" />
+    <View className="flex-1 pb-5" style={{ backgroundColor: colors.card }}>
+      
+      {/* Drawer Logo Header */}
+      <View 
+        className="flex-row items-center gap-2.5 px-5 py-5 border-b"
+        style={{ borderBottomColor: colors.border }}
+      >
+        <View 
+          className="w-9 h-9 rounded-xl items-center justify-center"
+          style={{ backgroundColor: colors.tint }}
+        >
+          <Bus size={20} color={colors.background} />
         </View>
         <View>
-          <Text style={styles.logoText}>
-            Smart<Text style={{ color: "#f7a01b" }}>Bus</Text>
+          <Text className="text-lg font-black tracking-tight" style={{ color: colors.text }}>
+            Smart<Text style={{ color: colors.tint }}>Bus</Text>
           </Text>
-          <View style={styles.adminBadge}>
-            <Text style={styles.adminBadgeText}>ADMIN</Text>
+          <View 
+            className="rounded-md px-1.5 py-0.5 mt-0.5 border self-start"
+            style={{ backgroundColor: `${colors.tint}1A`, borderColor: `${colors.tint}33` }}
+          >
+            <Text className="text-[7px] font-black tracking-widest" style={{ color: colors.tint }}>ADMIN</Text>
           </View>
         </View>
       </View>
 
-      <Text style={styles.menuLabel}>Operational Command</Text>
+      <Text className="text-[9px] font-black tracking-[3px] uppercase px-5 mt-5 mb-2" style={{ color: colors.icon }}>
+        Operational Command
+      </Text>
 
+      {/* Navigation Links */}
       <DrawerContentScrollView {...props} showsVerticalScrollIndicator={false}>
         {ADMIN_NAV.map((item) => {
           const Icon = item.icon;
@@ -56,87 +74,58 @@ function AdminDrawerContent(props: any) {
           return (
             <TouchableOpacity
               key={item.name}
-              style={[styles.navItem, isActive && styles.navItemActive]}
+              className="flex-row items-center gap-3 px-4 py-3 rounded-2xl mx-2 mb-0.5 relative"
+              style={{ backgroundColor: isActive ? `${colors.tint}1A` : "transparent" }}
               onPress={() => router.push(`/(admin)/${item.name}` as any)}
+              activeOpacity={0.7}
             >
-              <Icon size={18} color={isActive ? "#f7a01b" : "#8a8d91"} />
-              <Text style={[styles.navLabel, isActive && styles.navLabelActive]}>
+              <Icon size={18} color={isActive ? colors.tint : colors.icon} />
+              <Text className="text-[13px] font-bold" style={{ color: isActive ? colors.tint : colors.icon }}>
                 {item.label}
               </Text>
-              {isActive && <View style={styles.activePill} />}
+              {isActive && (
+                <View className="absolute left-0 w-[3px] h-5 rounded-sm" style={{ backgroundColor: colors.tint }} />
+              )}
             </TouchableOpacity>
           );
         })}
       </DrawerContentScrollView>
 
-      <View style={styles.drawerBottom}>
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <LogOut size={18} color="#ef4444" />
-          <Text style={styles.logoutText}>Sign Out</Text>
+      {/* Logout Button */}
+      <View className="border-t pt-3 px-2" style={{ borderTopColor: colors.border }}>
+        <TouchableOpacity 
+          className="flex-row items-center gap-3 px-4 py-3.5 rounded-2xl"
+          onPress={handleLogout}
+          activeOpacity={0.7}
+        >
+          <LogOut size={18} color={colors.error || "#ef4444"} />
+          <Text className="text-[11px] font-black uppercase tracking-widest" style={{ color: colors.error || "#ef4444" }}>
+            Sign Out
+          </Text>
         </TouchableOpacity>
       </View>
+
     </View>
   );
 }
 
 export default function AdminLayout() {
+  const colors = useThemeColor(); // 🟢 سحب الألوان لخصائص الـ Drawer
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <Drawer
-        drawerContent={(props) => <AdminDrawerContent {...props} />}
-        screenOptions={{
-          headerShown: false,
-          drawerStyle: { backgroundColor: "#1c1e26", width: 280 },
-        }}
-      />
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <Drawer
+          drawerContent={(props) => <AdminDrawerContent {...props} />}
+          screenOptions={{
+            headerShown: false,
+            drawerStyle: { backgroundColor: colors.card, width: 280 },
+          }}
+        />
+        
+        {/* البار الثابت هيترندر هنا مرة واحدة بس ويغطي التطبيق من تحت */}
+        {/* <Appbar /> */}
+      </View>
     </GestureHandlerRootView>
   );
 }
-
-const styles = StyleSheet.create({
-  drawer: { flex: 1, backgroundColor: "#1c1e26", paddingBottom: 20 },
-  drawerLogo: {
-    flexDirection: "row", alignItems: "center", gap: 10,
-    paddingHorizontal: 20, paddingVertical: 20,
-    borderBottomWidth: 1, borderBottomColor: "#2d3036",
-  },
-  logoBox: {
-    width: 36, height: 36, backgroundColor: "#f7a01b",
-    borderRadius: 10, alignItems: "center", justifyContent: "center",
-  },
-  logoText: { fontSize: 18, fontWeight: "900", color: "#fff", letterSpacing: -0.5 },
-  adminBadge: {
-    backgroundColor: "rgba(247,160,27,0.1)", borderRadius: 6,
-    paddingHorizontal: 6, paddingVertical: 2, marginTop: 2,
-    borderWidth: 1, borderColor: "rgba(247,160,27,0.2)",
-    alignSelf: "flex-start",
-  },
-  adminBadgeText: { fontSize: 7, fontWeight: "900", color: "#f7a01b", letterSpacing: 1.5 },
-  menuLabel: {
-    fontSize: 9, fontWeight: "900", color: "#8a8d91",
-    letterSpacing: 3, textTransform: "uppercase",
-    paddingHorizontal: 20, marginTop: 20, marginBottom: 8,
-  },
-  navItem: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    paddingHorizontal: 16, paddingVertical: 12,
-    borderRadius: 16, marginHorizontal: 8, marginBottom: 2,
-    position: "relative",
-  },
-  navItemActive: { backgroundColor: "rgba(247,160,27,0.1)" },
-  navLabel: { fontSize: 13, fontWeight: "700", color: "#8a8d91" },
-  navLabelActive: { color: "#f7a01b" },
-  activePill: {
-    position: "absolute", left: 0, width: 3,
-    height: 20, backgroundColor: "#f7a01b", borderRadius: 2,
-  },
-  drawerBottom: {
-    borderTopWidth: 1, borderTopColor: "#2d3036",
-    paddingTop: 12, paddingHorizontal: 8,
-  },
-  logoutBtn: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16,
-  },
-  logoutText: { fontSize: 11, fontWeight: "900", color: "#ef4444", textTransform: "uppercase", letterSpacing: 2 },
-});
