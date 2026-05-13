@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import BottomBar from "@/src/components/bar";
 import {
   View, Text, TouchableOpacity, ScrollView,
   ActivityIndicator, Modal, Platform
@@ -290,7 +291,7 @@ export default function SupportScreen() {
         </View>
       </Modal>
 
-      <Appbar />
+<BottomBar role="admin" />
     </View>
   );
 }

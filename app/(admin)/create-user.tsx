@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import BottomBar from "@/src/components/bar";
 import { 
   View, Text, TextInput, TouchableOpacity, ScrollView, 
   ActivityIndicator, KeyboardAvoidingView, Platform 
@@ -197,7 +198,7 @@ export default function CreateUserPage() {
 
         </ScrollView>
       </KeyboardAvoidingView>
-      <Appbar />
+<BottomBar role="admin" />
     </View>
   );
 }

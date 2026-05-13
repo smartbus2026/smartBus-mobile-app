@@ -1,82 +1,91 @@
-// src/components/Topbar.tsx
-import { View, TouchableOpacity, StyleSheet, Text } from "react-native";
-import { Home, Search, Bell, User } from "lucide-react-native";
+import React from "react";
+import { View, TouchableOpacity, Text, Platform, StyleSheet } from "react-native";
+import { Home, Route, Bell, User, Menu } from "lucide-react-native";
 import { useRouter, usePathname } from "expo-router";
+import { useThemeColor } from "../../constants/theme";
+import { useDrawerStatus } from "@react-navigation/drawer";
+import { DrawerActions } from "@react-navigation/native";
+import { useNavigation } from "expo-router";
 
-export default function BottomBar() {
-  const router = useRouter();
+interface BottomBarProps {
+  role: "admin" | "student";
+}
+
+const ADMIN_TABS = [
+  { id: "dashboard",     label: "Home",    icon: Home,  path: "/(admin)/dashboard" },
+  { id: "trips",         label: "Trips",   icon: Route, path: "/(admin)/trips" },
+  { id: "notifications", label: "Alerts",  icon: Bell,  path: "/(admin)/notifications" },
+];
+
+const STUDENT_TABS = [
+  { id: "dashboard",     label: "Home",    icon: Home,  path: "/(student)/dashboard" },
+  { id: "my-trips",      label: "Trips",   icon: Route, path: "/(student)/my-trips" },
+  { id: "notifications", label: "Alerts",  icon: Bell,  path: "/(student)/notifications" },
+  { id: "settings",      label: "Profile", icon: User,  path: "/(student)/settings" },
+];
+
+export default function BottomBar({ role }: BottomBarProps) {
+  const colors   = useThemeColor();
+  const router   = useRouter();
   const pathname = usePathname();
+  const navigation = useNavigation();
 
-  // فنكشن عشان نعرف إحنا في أنهي صفحة وننور الأيقونة بتاعتها
-  const isActive = (route: string) => pathname.includes(route);
+  const isActive = (id: string) => pathname.includes(id.toLowerCase());
+  const tabs = role === "admin" ? ADMIN_TABS : STUDENT_TABS;
+
+  const openDrawer = () => {
+    // بنجرب نفتح الـ drawer من كل الـ parents المحتملة
+    const nav = navigation as any;
+    try { nav.dispatch(DrawerActions.openDrawer()); return; } catch {}
+    try { nav.getParent()?.dispatch(DrawerActions.openDrawer()); return; } catch {}
+    try { nav.getParent()?.getParent()?.dispatch(DrawerActions.openDrawer()); return; } catch {}
+    try { nav.getParent()?.getParent()?.getParent()?.dispatch(DrawerActions.openDrawer()); } catch {}
+  };
 
   return (
-    <View style={styles.container}>
-      {/* Home */}
-      <TouchableOpacity 
-        style={styles.tab} 
-        onPress={() => router.push("/(admin)/dashboard")}
-      >
-        <Home size={24} color={isActive('dashboard') ? "#f7a01b" : "#8a8d91"} />
-        <Text style={[styles.tabText, isActive('dashboard') && styles.activeText]}>Home</Text>
-      </TouchableOpacity>
+    <View style={[s.bar, {
+      backgroundColor: colors.card,
+      borderTopColor:  colors.border,
+      height:          Platform.OS === "ios" ? 85 : 70,
+      paddingBottom:   Platform.OS === "ios" ? 25 : 10,
+    }]}>
+      {tabs.map((tab) => {
+        const Icon   = tab.icon;
+        const active = isActive(tab.id);
+        return (
+          <TouchableOpacity
+            key={tab.id}
+            style={s.tab}
+            onPress={() => router.push(tab.path as any)}
+            activeOpacity={0.7}
+          >
+            <Icon size={22} color={active ? colors.tint : colors.icon} />
+            <Text style={[s.label, { color: active ? colors.tint : colors.icon }]}>
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
 
-      {/* Search */}
-      <TouchableOpacity 
-        style={styles.tab} 
-        onPress={() => router.push("/search")}
-      >
-        <Search size={24} color={isActive('search') ? "#f7a01b" : "#8a8d91"} />
-        <Text style={[styles.tabText, isActive('search') && styles.activeText]}>Search</Text>
-      </TouchableOpacity>
-
-      {/* Notifications */}
-      <TouchableOpacity 
-        style={styles.tab} 
-        onPress={() => router.push("/notifications")}
-      >
-        <Bell size={24} color={isActive('notifications') ? "#f7a01b" : "#8a8d91"} />
-        <Text style={[styles.tabText, isActive('notifications') && styles.activeText]}>Alerts</Text>
-      </TouchableOpacity>
-
-      {/* Profile */}
-      <TouchableOpacity 
-        style={styles.tab} 
-        onPress={() => router.push("/settings")} // أو صفحة البروفايل لو عملتيها
-      >
-        <User size={24} color={isActive('settings') ? "#f7a01b" : "#8a8d91"} />
-        <Text style={[styles.tabText, isActive('settings') && styles.activeText]}>Profile</Text>
+      {/* Menu Button → يفتح الـ Drawer */}
+      <TouchableOpacity style={s.tab} onPress={openDrawer} activeOpacity={0.7}>
+        <Menu size={22} color={colors.icon} />
+        <Text style={[s.label, { color: colors.icon }]}>Menu</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    backgroundColor: "#1c1e26",
-    height: 70,
-    borderTopWidth: 1,
-    borderTopColor: "#2d3036",
+const s = StyleSheet.create({
+  bar: {
+    flexDirection:  "row",
     justifyContent: "space-around",
-    alignItems: "center",
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingBottom: 10, // عشان الـ Home Indicator في الآيفون
+    alignItems:     "center",
+    position:       "absolute",
+    bottom: 0, left: 0, right: 0,
+    borderTopWidth: 1,
+    paddingTop:     10,
   },
-  tab: {
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-  },
-  tabText: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#8a8d91",
-  },
-  activeText: {
-    color: "#f7a01b",
-  },
+  tab:   { flex: 1, alignItems: "center", justifyContent: "center", gap: 4 },
+  label: { fontSize: 10, fontWeight: "700" },
 });

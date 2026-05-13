@@ -1,5 +1,6 @@
 // app/(admin)/settings.tsx
 import React from 'react';
+import BottomBar from "@/src/components/bar";
 import { View, Text, StyleSheet, Switch, TouchableOpacity } from 'react-native';
 import { Moon, Sun, Settings as SettingsIcon, ChevronLeft } from 'lucide-react-native';
 import { useTheme } from '../../src/context/ThemeContext';
@@ -54,8 +55,7 @@ export default function SettingsPage() {
           />
         </View>
       </View>
-            <Appbar />
-      
+<BottomBar role="admin" />      
     </View>
   );
 }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import BottomBar from "@/src/components/bar";
 import {
   View, Text, TextInput, TouchableOpacity,
   ActivityIndicator, ScrollView,
@@ -460,7 +461,7 @@ export default function ManageRoutesScreen() {
           </View>
         </View>
       </Modal>
-      <Appbar />
+<BottomBar role="admin" />
     </View>
   );
 }

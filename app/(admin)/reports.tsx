@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import BottomBar from "@/src/components/bar";
 import {
   View, Text, TouchableOpacity, ScrollView,
   ActivityIndicator, Modal, Platform
@@ -291,7 +292,7 @@ export default function AdminReports() {
 
       {/* ... (Trip Modal & Close Trip Modal follow the same Tailwind pattern) ... */}
       
-      <Appbar />
+<BottomBar role="admin" />
     </View>
   );
 }

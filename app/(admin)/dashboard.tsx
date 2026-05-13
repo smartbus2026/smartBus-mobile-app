@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect } from "react"; 
+import BottomBar from "@/src/components/bar";
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator
 } from "react-native";
@@ -211,7 +212,6 @@ export default function AdminDashboard() {
       </ScrollView>
 
       {/* Appbar ثابت تحت */}
-      <Appbar />
-    </View>
+<BottomBar role="admin" />    </View>
   );
 }
