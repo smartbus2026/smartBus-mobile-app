@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
+import { ThemeProvider } from '../src/context/ThemeContext';
 
 function RootGuard() {
   const { token, userRole, isLoading } = useAuth();
@@ -39,8 +40,10 @@ function RootGuard() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <RootGuard />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <RootGuard />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

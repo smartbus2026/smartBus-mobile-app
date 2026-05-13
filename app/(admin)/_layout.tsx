@@ -1,32 +1,31 @@
-import { View, Text, TouchableOpacity } from "react-native";
+import { View, Text, TouchableOpacity, Platform } from "react-native";
 import { Drawer } from "expo-router/drawer";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
   LayoutGrid, Plus, Users, Route, Target,
-  Bell, MessageCircle, BarChart2, Settings, LogOut, Bus
+  Bell, MessageCircle, BarChart2, Settings, LogOut, Bus,
 } from "lucide-react-native";
 import { DrawerContentScrollView } from "@react-navigation/drawer";
 import { router } from "expo-router";
 import { useAuth } from "../../src/context/AuthContext";
-// ضفنا الاستدعاء بتاع البار هنا
-import Appbar from "../../src/components/bar"; 
-import { useThemeColor } from "../../constants/theme"; // 🟢 استدعاء الهوك
+import { useThemeColor } from "../../constants/theme";
+import BottomBar from "../../src/components/bar";
 
 const ADMIN_NAV = [
-  { name: "dashboard",     label: "Dashboard",        icon: LayoutGrid },
-  { name: "create-trip",   label: "Create Trip",      icon: Plus },
-  { name: "users",         label: "Users",            icon: Users },
-  { name: "routes",        label: "Manage Routes",    icon: Route },
-  { name: "trips",         label: "Manage Trips",     icon: Route },
-  { name: "live-tracking", label: "Live Tracking",    icon: Target },
-  { name: "notifications", label: "Notifications",    icon: Bell },
-  { name: "support",       label: "Support Inbox",    icon: MessageCircle },
-  { name: "reports",       label: "System Reports",   icon: BarChart2 },
-  { name: "settings",      label: "Settings",         icon: Settings },
+  { name: "dashboard",     label: "Dashboard",      icon: LayoutGrid },
+  { name: "create-trip",   label: "Create Trip",    icon: Plus },
+  { name: "users",         label: "Users",          icon: Users },
+  { name: "routes",        label: "Manage Routes",  icon: Route },
+  { name: "trips",         label: "Manage Trips",   icon: Route },
+  { name: "live-tracking", label: "Live Tracking",  icon: Target },
+  { name: "notifications", label: "Notifications",  icon: Bell },
+  { name: "support",       label: "Support Inbox",  icon: MessageCircle },
+  { name: "reports",       label: "System Reports", icon: BarChart2 },
+  { name: "settings",      label: "Settings",       icon: Settings },
 ];
 
 function AdminDrawerContent(props: any) {
-  const colors = useThemeColor(); // 🟢 سحب الألوان
+  const colors  = useThemeColor();
   const { logout } = useAuth();
   const current = props.state?.routeNames[props.state?.index];
 
@@ -36,81 +35,99 @@ function AdminDrawerContent(props: any) {
   };
 
   return (
-    <View className="flex-1 pb-5" style={{ backgroundColor: colors.card }}>
-      
-      {/* Drawer Logo Header */}
-      <View 
-        className="flex-row items-center gap-2.5 px-5 py-5 border-b"
-        style={{ borderBottomColor: colors.border }}
-      >
-        <View 
-          className="w-9 h-9 rounded-xl items-center justify-center"
-          style={{ backgroundColor: colors.tint }}
-        >
-          <Bus size={20} color={colors.background} />
+    <View style={{ flex: 1, paddingBottom: 20, backgroundColor: colors.card }}>
+
+      {/* Header */}
+      <View style={{
+        flexDirection: "row", alignItems: "center", gap: 10,
+        paddingHorizontal: 20, paddingVertical: 20,
+        borderBottomWidth: 1, borderBottomColor: colors.border,
+        paddingTop: Platform.OS === "ios" ? 55 : 20,
+      }}>
+        <View style={{
+          width: 36, height: 36, borderRadius: 12,
+          alignItems: "center", justifyContent: "center",
+          backgroundColor: colors.tint,
+        }}>
+          <Bus size={18} color={colors.background} />
         </View>
         <View>
-          <Text className="text-lg font-black tracking-tight" style={{ color: colors.text }}>
+          <Text style={{ fontSize: 18, fontWeight: "900", color: colors.text }}>
             Smart<Text style={{ color: colors.tint }}>Bus</Text>
           </Text>
-          <View 
-            className="rounded-md px-1.5 py-0.5 mt-0.5 border self-start"
-            style={{ backgroundColor: `${colors.tint}1A`, borderColor: `${colors.tint}33` }}
-          >
-            <Text className="text-[7px] font-black tracking-widest" style={{ color: colors.tint }}>ADMIN</Text>
+          <View style={{
+            borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
+            marginTop: 2, alignSelf: "flex-start",
+            backgroundColor: `${colors.tint}1A`,
+            borderWidth: 1, borderColor: `${colors.tint}33`,
+          }}>
+            <Text style={{ fontSize: 7, fontWeight: "900", letterSpacing: 2, color: colors.tint }}>
+              ADMIN
+            </Text>
           </View>
         </View>
       </View>
 
-      <Text className="text-[9px] font-black tracking-[3px] uppercase px-5 mt-5 mb-2" style={{ color: colors.icon }}>
+      <Text style={{
+        fontSize: 9, fontWeight: "800", letterSpacing: 3,
+        textTransform: "uppercase", paddingHorizontal: 20,
+        marginTop: 20, marginBottom: 8, color: colors.icon,
+      }}>
         Operational Command
       </Text>
 
-      {/* Navigation Links */}
+      {/* Nav Links */}
       <DrawerContentScrollView {...props} showsVerticalScrollIndicator={false}>
         {ADMIN_NAV.map((item) => {
-          const Icon = item.icon;
+          const Icon     = item.icon;
           const isActive = current === item.name;
           return (
             <TouchableOpacity
               key={item.name}
-              className="flex-row items-center gap-3 px-4 py-3 rounded-2xl mx-2 mb-0.5 relative"
-              style={{ backgroundColor: isActive ? `${colors.tint}1A` : "transparent" }}
+              style={{
+                flexDirection: "row", alignItems: "center", gap: 12,
+                paddingHorizontal: 16, paddingVertical: 12,
+                borderRadius: 16, marginHorizontal: 8, marginBottom: 2,
+                backgroundColor: isActive ? `${colors.tint}1A` : "transparent",
+              }}
               onPress={() => router.push(`/(admin)/${item.name}` as any)}
               activeOpacity={0.7}
             >
               <Icon size={18} color={isActive ? colors.tint : colors.icon} />
-              <Text className="text-[13px] font-bold" style={{ color: isActive ? colors.tint : colors.icon }}>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: isActive ? colors.tint : colors.icon }}>
                 {item.label}
               </Text>
               {isActive && (
-                <View className="absolute left-0 w-[3px] h-5 rounded-sm" style={{ backgroundColor: colors.tint }} />
+                <View style={{
+                  position: "absolute", left: 0,
+                  width: 3, height: 20, borderRadius: 2,
+                  backgroundColor: colors.tint,
+                }} />
               )}
             </TouchableOpacity>
           );
         })}
       </DrawerContentScrollView>
 
-      {/* Logout Button */}
-      <View className="border-t pt-3 px-2" style={{ borderTopColor: colors.border }}>
-        <TouchableOpacity 
-          className="flex-row items-center gap-3 px-4 py-3.5 rounded-2xl"
+      {/* Logout */}
+      <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12, paddingHorizontal: 8 }}>
+        <TouchableOpacity
+          style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16 }}
           onPress={handleLogout}
           activeOpacity={0.7}
         >
-          <LogOut size={18} color={colors.error || "#ef4444"} />
-          <Text className="text-[11px] font-black uppercase tracking-widest" style={{ color: colors.error || "#ef4444" }}>
+          <LogOut size={18} color="#ef4444" />
+          <Text style={{ fontSize: 11, fontWeight: "900", textTransform: "uppercase", letterSpacing: 2, color: "#ef4444" }}>
             Sign Out
           </Text>
         </TouchableOpacity>
       </View>
-
     </View>
   );
 }
 
 export default function AdminLayout() {
-  const colors = useThemeColor(); // 🟢 سحب الألوان لخصائص الـ Drawer
+  const colors = useThemeColor();
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -122,9 +139,7 @@ export default function AdminLayout() {
             drawerStyle: { backgroundColor: colors.card, width: 280 },
           }}
         />
-        
-        {/* البار الثابت هيترندر هنا مرة واحدة بس ويغطي التطبيق من تحت */}
-        {/* <Appbar /> */}
+        <BottomBar role="admin" />
       </View>
     </GestureHandlerRootView>
   );
