@@ -10,8 +10,6 @@ import { DrawerContentScrollView } from "@react-navigation/drawer";
 import { router, usePathname } from "expo-router";
 import { useAuth } from "../../src/context/AuthContext";
 import { useThemeColor } from "../../constants/theme";
-import { DrawerActions } from "@react-navigation/native";
-import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const STUDENT_NAV = [
@@ -39,9 +37,9 @@ function StudentDrawerContent(props: any) {
   };
 
   return (
-    <View style={{ flex: 1, paddingBottom: 20, backgroundColor: colors.card }}>
+    <View style={{ flex: 1, backgroundColor: colors.card }}>
 
-      {/* Header */}
+      {/* ── Header ── */}
       <View style={{
         flexDirection: 'row', alignItems: 'center', gap: 10,
         paddingHorizontal: 20, paddingVertical: 20,
@@ -79,8 +77,12 @@ function StudentDrawerContent(props: any) {
         Navigation
       </Text>
 
-      {/* Nav Links */}
-      <DrawerContentScrollView {...props} showsVerticalScrollIndicator={false}>
+      {/* ── Nav Links — flex: 1 عشان ياخد باقي المساحة ── */}
+      <DrawerContentScrollView
+        {...props}
+        showsVerticalScrollIndicator={false}
+        style={{ flex: 1 }}
+      >
         {STUDENT_NAV.map((item) => {
           const Icon     = item.icon;
           const isActive = current === item.name;
@@ -89,7 +91,7 @@ function StudentDrawerContent(props: any) {
               key={item.name}
               style={{
                 flexDirection: 'row', alignItems: 'center', gap: 12,
-                paddingHorizontal: 16, paddingVertical: 12,
+                paddingHorizontal: 16, paddingVertical: 10,
                 borderRadius: 16, marginHorizontal: 8, marginBottom: 2,
                 backgroundColor: isActive ? `${colors.tint}1A` : 'transparent',
               }}
@@ -97,10 +99,7 @@ function StudentDrawerContent(props: any) {
               activeOpacity={0.7}
             >
               <Icon size={18} color={isActive ? colors.tint : colors.icon} />
-              <Text style={{
-                fontSize: 13, fontWeight: '700',
-                color: isActive ? colors.tint : colors.icon,
-              }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: isActive ? colors.tint : colors.icon }}>
                 {item.label}
               </Text>
               {isActive && (
@@ -114,10 +113,18 @@ function StudentDrawerContent(props: any) {
         })}
       </DrawerContentScrollView>
 
-      {/* ✅ Logout */}
-      <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12, paddingHorizontal: 8 }}>
+      {/* ── Logout — دايماً في الأسفل ── */}
+      <View style={{
+        borderTopWidth: 1, borderTopColor: colors.border,
+        paddingTop: 8, paddingBottom: insets.bottom + 8,
+        paddingHorizontal: 8,
+      }}>
         <TouchableOpacity
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16 }}
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 12,
+            paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16,
+            backgroundColor: 'rgba(239,68,68,0.08)',
+          }}
           onPress={handleLogout}
           activeOpacity={0.7}
         >
@@ -138,7 +145,6 @@ function StudentBottomBar() {
 
   const isActive = (route: string) => pathname.includes(route.toLowerCase());
 
-  // ✅ شيلنا Menu من هنا
   const tabs = [
     { id: "dashboard",     label: "Home",    icon: Home,  path: "/(student)/dashboard" },
     { id: "my-trips",      label: "Trips",   icon: Route, path: "/(student)/my-trips" },
