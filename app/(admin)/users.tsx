@@ -1,4 +1,4 @@
-import { router, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { Edit2, Plus, Search, Shield, Trash2, User as UserIcon, X } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {

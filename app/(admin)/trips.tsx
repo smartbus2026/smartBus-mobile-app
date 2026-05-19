@@ -10,8 +10,7 @@ import {
 import { useThemeColor } from "../../constants/theme";
 import api from "../../src/services/api";
 import TopBar from "../../src/components/TopBar";
-import { router, useRouter } from "@/.expo/types/router";
-
+import { useRouter } from "expo-router";
 interface TripData {
   id: string;
   routeName: string;
