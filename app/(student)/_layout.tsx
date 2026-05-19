@@ -2,35 +2,36 @@ import { View, Text, TouchableOpacity, Platform } from "react-native";
 import { Drawer } from "expo-router/drawer";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
-  Home, Search, Bell, User, Bus, LogOut,
+  Home, Bell, User, Bus, LogOut,
   Map, BookOpen, Navigation, MessageCircle,
   HelpCircle, Calendar, Route,
 } from "lucide-react-native";
 import { DrawerContentScrollView } from "@react-navigation/drawer";
-import { router, Tabs, usePathname } from "expo-router";
+import { router, usePathname } from "expo-router";
 import { useAuth } from "../../src/context/AuthContext";
 import { useThemeColor } from "../../constants/theme";
 import { DrawerActions } from "@react-navigation/native";
 import { useNavigation } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const STUDENT_NAV = [
-  { name: "dashboard",      label: "Home",           icon: Home },
-  { name: "my-trips",       label: "My Trips",       icon: Route },
-  { name: "book-trip",      label: "Book a Trip",    icon: BookOpen },
-  { name: "attendance",     label: "Attendance",     icon: Calendar },
-  { name: "track-bus",      label: "Track Bus",      icon: Navigation },
-  { name: "route-details",  label: "Route Details",  icon: Map },
-  { name: "route-chat",     label: "Route Chat",     icon: MessageCircle },
-  { name: "search",         label: "Search",         icon: Search },
-  { name: "notifications",  label: "Notifications",  icon: Bell },
-  { name: "support",        label: "Support",        icon: HelpCircle },
-  { name: "settings",       label: "Profile",        icon: User },
+  { name: "dashboard",     label: "Home",          icon: Home },
+  { name: "my-trips",      label: "My Trips",      icon: Route },
+  { name: "book-trip",     label: "Book a Trip",   icon: BookOpen },
+  { name: "attendance",    label: "Attendance",    icon: Calendar },
+  { name: "track-bus",     label: "Track Bus",     icon: Navigation },
+  { name: "route-details", label: "Route Details", icon: Map },
+  { name: "route-chat",    label: "Route Chat",    icon: MessageCircle },
+  { name: "notifications", label: "Notifications", icon: Bell },
+  { name: "support",       label: "Support",       icon: HelpCircle },
+  { name: "settings",      label: "Profile",       icon: User },
 ];
 
 function StudentDrawerContent(props: any) {
-  const colors = useThemeColor();
+  const colors     = useThemeColor();
   const { logout } = useAuth();
-  const current = props.state?.routeNames[props.state?.index];
+  const insets     = useSafeAreaInsets();
+  const current    = props.state?.routeNames[props.state?.index];
 
   const handleLogout = async () => {
     await logout();
@@ -45,9 +46,13 @@ function StudentDrawerContent(props: any) {
         flexDirection: 'row', alignItems: 'center', gap: 10,
         paddingHorizontal: 20, paddingVertical: 20,
         borderBottomWidth: 1, borderBottomColor: colors.border,
-        paddingTop: Platform.OS === 'ios' ? 55 : 20,
+        paddingTop: insets.top + 10,
       }}>
-        <View style={{ width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tint }}>
+        <View style={{
+          width: 36, height: 36, borderRadius: 12,
+          alignItems: 'center', justifyContent: 'center',
+          backgroundColor: colors.tint,
+        }}>
           <Bus size={18} color={colors.background} />
         </View>
         <View>
@@ -59,7 +64,9 @@ function StudentDrawerContent(props: any) {
             backgroundColor: `${colors.tint}1A`, borderWidth: 1, borderColor: `${colors.tint}33`,
             alignSelf: 'flex-start',
           }}>
-            <Text style={{ fontSize: 7, fontWeight: '900', letterSpacing: 2, color: colors.tint }}>STUDENT</Text>
+            <Text style={{ fontSize: 7, fontWeight: '900', letterSpacing: 2, color: colors.tint }}>
+              STUDENT
+            </Text>
           </View>
         </View>
       </View>
@@ -75,7 +82,7 @@ function StudentDrawerContent(props: any) {
       {/* Nav Links */}
       <DrawerContentScrollView {...props} showsVerticalScrollIndicator={false}>
         {STUDENT_NAV.map((item) => {
-          const Icon = item.icon;
+          const Icon     = item.icon;
           const isActive = current === item.name;
           return (
             <TouchableOpacity
@@ -107,7 +114,7 @@ function StudentDrawerContent(props: any) {
         })}
       </DrawerContentScrollView>
 
-      {/* Logout */}
+      {/* ✅ Logout */}
       <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12, paddingHorizontal: 8 }}>
         <TouchableOpacity
           style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16 }}
@@ -120,35 +127,24 @@ function StudentDrawerContent(props: any) {
           </Text>
         </TouchableOpacity>
       </View>
+
     </View>
   );
 }
 
 function StudentBottomBar() {
-  const colors = useThemeColor();
+  const colors   = useThemeColor();
   const pathname = usePathname();
-  const navigation = useNavigation();
 
   const isActive = (route: string) => pathname.includes(route.toLowerCase());
 
+  // ✅ شيلنا Menu من هنا
   const tabs = [
-    { id: "dashboard",     label: "Home",    icon: Home,       path: "/(student)/dashboard" },
-    { id: "my-trips",      label: "Trips",   icon: Route,      path: "/(student)/my-trips" },
-    { id: "notifications", label: "Alerts",  icon: Bell,       path: "/(student)/notifications" },
-    { id: "settings",      label: "Profile", icon: User,       path: "/(student)/settings" },
+    { id: "dashboard",     label: "Home",    icon: Home,  path: "/(student)/dashboard" },
+    { id: "my-trips",      label: "Trips",   icon: Route, path: "/(student)/my-trips" },
+    { id: "notifications", label: "Alerts",  icon: Bell,  path: "/(student)/notifications" },
+    { id: "settings",      label: "Profile", icon: User,  path: "/(student)/settings" },
   ];
-
-  const openDrawer = () => {
-    try {
-      navigation.dispatch(DrawerActions.openDrawer());
-    } catch {
-      try {
-        navigation.getParent()?.dispatch(DrawerActions.openDrawer());
-      } catch {
-        navigation.getParent()?.getParent()?.dispatch(DrawerActions.openDrawer());
-      }
-    }
-  };
 
   return (
     <View style={{
@@ -161,7 +157,7 @@ function StudentBottomBar() {
       paddingTop: 10,
     }}>
       {tabs.map((tab) => {
-        const Icon = tab.icon;
+        const Icon   = tab.icon;
         const active = isActive(tab.id);
         return (
           <TouchableOpacity
@@ -177,20 +173,6 @@ function StudentBottomBar() {
           </TouchableOpacity>
         );
       })}
-
-      {/* Menu Button */}
-      <TouchableOpacity
-        style={{ alignItems: 'center', justifyContent: 'center', flex: 1 }}
-        onPress={openDrawer}
-        activeOpacity={0.7}
-      >
-        <View style={{ width: 22, height: 22, justifyContent: 'space-between', paddingVertical: 3 }}>
-          <View style={{ height: 2, backgroundColor: colors.icon, borderRadius: 1 }} />
-          <View style={{ height: 2, width: 16, backgroundColor: colors.icon, borderRadius: 1 }} />
-          <View style={{ height: 2, backgroundColor: colors.icon, borderRadius: 1 }} />
-        </View>
-        <Text style={{ fontSize: 10, fontWeight: '700', marginTop: 4, color: colors.icon }}>Menu</Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -200,16 +182,14 @@ export default function StudentLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <Drawer
-          drawerContent={(props) => <StudentDrawerContent {...props} />}
-          screenOptions={{
-            headerShown: false,
-            drawerStyle: { backgroundColor: colors.card, width: 280 },
-          }}
-        />
-        <StudentBottomBar />
-      </View>
+      <Drawer
+        drawerContent={(props) => <StudentDrawerContent {...props} />}
+        screenOptions={{
+          headerShown: false,
+          drawerStyle: { backgroundColor: colors.card, width: 280 },
+        }}
+      />
+      <StudentBottomBar />
     </GestureHandlerRootView>
   );
 }

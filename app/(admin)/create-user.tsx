@@ -1,29 +1,37 @@
-import React, { useState, useEffect } from 'react';
-import BottomBar from "@/src/components/bar";
-import { 
-  View, Text, TextInput, TouchableOpacity, ScrollView, 
-  ActivityIndicator, KeyboardAvoidingView, Platform 
-} from 'react-native';
-import { useForm, Controller } from 'react-hook-form';
-import { 
-  User, Phone, Hash, ShieldCheck, Lock, 
-  Eye, EyeOff, CheckCircle, AlertCircle, ArrowLeft 
-} from 'lucide-react-native';
-import Api from '../../src/services/api'; 
-import { RegisterPayload } from '../../src/types/index'; 
+import BottomBar from "@/src/components/sidebar";
 import { useRouter } from 'expo-router';
-import Appbar from '../../src/components/bar';
-import { useThemeColor } from '../../constants/theme'; // 🟢 استدعاء الهوك
+import {
+    AlertCircle,
+    CheckCircle,
+    Eye, EyeOff,
+    Hash,
+    Lock,
+    Phone,
+    ShieldCheck,
+    User
+} from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import { Controller, useForm } from 'react-hook-form';
+import {
+    ActivityIndicator, KeyboardAvoidingView, Platform,
+    ScrollView,
+    Text, TextInput, TouchableOpacity,
+    View
+} from 'react-native';
+import { useThemeColor } from '../../constants/theme';
+import Api from '../../src/services/api';
+import { RegisterPayload } from '../../src/types/index';
+import TopBar from '../../src/components/TopBar';
 
 export default function CreateUserPage() {
-  const colors = useThemeColor(); // 🟢 سحب الألوان
+  const colors = useThemeColor();
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | null }>({ msg: '', type: null });
 
   const { control, handleSubmit, watch } = useForm<RegisterPayload & { role: 'student' | 'admin' }>({
-    defaultValues: { 
+    defaultValues: {
       role: 'student',
       name: '',
       email: '',
@@ -47,7 +55,6 @@ export default function CreateUserPage() {
       setToast({ msg: 'Name, Email and Password are required', type: 'error' });
       return;
     }
-
     setLoading(true);
     try {
       await Api.post('/auth/register', {
@@ -58,7 +65,6 @@ export default function CreateUserPage() {
         phone_number: data.phone_number,
         ...(data.role === 'student' ? { student_id: data.student_id } : {}),
       });
-      
       setToast({ msg: 'User added successfully', type: 'success' });
       setTimeout(() => router.back(), 1500);
     } catch (error: any) {
@@ -69,80 +75,76 @@ export default function CreateUserPage() {
   };
 
   return (
-    <View className="flex-1" style={{ backgroundColor: colors.background }}>
-      
-      {/* Toast */}
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+
+      {/* ── Top Bar ── */}
+      <TopBar
+        title="Create User"
+        showBack
+      />
+
+      {/* ── Toast ── */}
       {toast.msg && (
-        <View 
-          className="absolute top-[60px] self-center z-50 flex-row items-center gap-2.5 py-3 px-5 rounded-full border shadow-lg"
-          style={{
-            backgroundColor: colors.card,
-            borderColor: toast.type === 'success' ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)",
-            shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15
-          }}
-        >
-          {toast.type === 'success' ? <CheckCircle size={16} color={colors.success || "#22c55e"} /> : <AlertCircle size={16} color={colors.error || "#ef4444"} />}
-          <Text 
-            className="text-[11px] font-black uppercase tracking-widest"
-            style={{ color: toast.type === 'success' ? (colors.success || "#22c55e") : (colors.error || "#ef4444") }}
-          >
+        <View style={{
+          position: 'absolute', top: 80, alignSelf: 'center', zIndex: 50,
+          flexDirection: 'row', alignItems: 'center', gap: 10,
+          paddingVertical: 12, paddingHorizontal: 20,
+          borderRadius: 999, borderWidth: 1,
+          backgroundColor: colors.card,
+          borderColor: toast.type === 'success' ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)",
+          shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15,
+        }}>
+          {toast.type === 'success'
+            ? <CheckCircle size={16} color="#22c55e" />
+            : <AlertCircle size={16} color="#ef4444" />
+          }
+          <Text style={{
+            fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2,
+            color: toast.type === 'success' ? "#22c55e" : "#ef4444",
+          }}>
             {toast.msg}
           </Text>
         </View>
       )}
 
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1">
-        <ScrollView 
-          contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 60, paddingBottom: 120 }} 
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+        <ScrollView
+          contentContainerStyle={{ padding: 20, paddingTop: 16, paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Header */}
-          <View className="flex-row items-center gap-4 mb-8 mt-2">
-            <TouchableOpacity 
-              onPress={() => router.back()} 
-              className="w-10 h-10 rounded-xl items-center justify-center border"
-              style={{ backgroundColor: colors.card, borderColor: colors.border }}
-              activeOpacity={0.7}
-            >
-              <ArrowLeft size={20} color={colors.text} />
-            </TouchableOpacity>
-            <View>
-              <Text className="text-[26px] font-black tracking-tight" style={{ color: colors.text }}>
-                New <Text style={{ color: colors.tint }}>Identity</Text>
-              </Text>
-              <Text className="text-[11px] font-bold uppercase mt-1" style={{ color: colors.icon }}>
-                Create a new system account
-              </Text>
-            </View>
-          </View>
 
-          {/* Role Selection */}
-          <Text className="text-[9px] font-black uppercase tracking-widest mb-3 ml-1" style={{ color: colors.icon }}>
+          {/* ── Role Selection ── */}
+          <Text style={{
+            fontSize: 9, fontWeight: '800', textTransform: 'uppercase',
+            letterSpacing: 3, marginBottom: 10, marginLeft: 4, color: colors.icon,
+          }}>
             Authority Level
           </Text>
-          <View className="mb-6">
+          <View style={{ marginBottom: 20 }}>
             <Controller
               control={control}
               name="role"
               render={({ field: { onChange, value } }) => (
-                <View 
-                  className="flex-row p-1 rounded-2xl border"
-                  style={{ backgroundColor: colors.card, borderColor: colors.border }}
-                >
+                <View style={{
+                  flexDirection: 'row', padding: 4, borderRadius: 18, borderWidth: 1,
+                  backgroundColor: colors.card, borderColor: colors.border,
+                }}>
                   {['student', 'admin'].map((role) => {
                     const isActive = value === role;
                     return (
                       <TouchableOpacity
                         key={role}
-                        className="flex-1 py-3 items-center justify-center rounded-xl"
-                        style={{ backgroundColor: isActive ? colors.tint : "transparent" }}
+                        style={{
+                          flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 14,
+                          backgroundColor: isActive ? colors.tint : 'transparent',
+                        }}
                         onPress={() => onChange(role)}
                         activeOpacity={0.8}
                       >
-                        <Text 
-                          className="text-[10px] font-black tracking-widest"
-                          style={{ color: isActive ? colors.background : colors.icon }}
-                        >
+                        <Text style={{
+                          fontSize: 10, fontWeight: '800', letterSpacing: 2,
+                          color: isActive ? '#000' : colors.icon,
+                        }}>
                           {role.toUpperCase()}
                         </Text>
                       </TouchableOpacity>
@@ -153,77 +155,84 @@ export default function CreateUserPage() {
             />
           </View>
 
-          {/* Form Fields Card */}
-          <View 
-            className="rounded-[28px] p-6 border shadow-sm"
-            style={{ backgroundColor: colors.card, borderColor: colors.border }}
-          >
-            <CustomInput control={control} name="name" label="Full Name" placeholder="e.g. Ahmed Mohamed" icon={User} />
-            <CustomInput control={control} name="email" label="Institutional Email" placeholder="name@university.edu" icon={ShieldCheck} />
+          {/* ── Form Card ── */}
+          <View style={{
+            borderWidth: 1, borderRadius: 24, padding: 18,
+            backgroundColor: colors.card, borderColor: colors.border,
+          }}>
 
-            <View className="flex-row gap-3">
-              <View className="flex-1">
-                <CustomInput control={control} name="phone_number" label="Phone" placeholder="01xxxx" icon={Phone} />
+            <CustomInput control={control} name="name"         label="Full Name"           placeholder="e.g. Ahmed Mohamed"    icon={User} />
+            <CustomInput control={control} name="email"        label="Institutional Email" placeholder="name@university.edu"  icon={ShieldCheck} />
+
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <CustomInput control={control} name="phone_number" label="Phone"     placeholder="01xxxx" icon={Phone} />
               </View>
               {selectedRole === 'student' && (
-                <View className="flex-1">
-                  <CustomInput control={control} name="student_id" label="ID Number" placeholder="ID#" icon={Hash} />
+                <View style={{ flex: 1 }}>
+                  <CustomInput control={control} name="student_id" label="ID Number" placeholder="ID#"    icon={Hash} />
                 </View>
               )}
             </View>
 
-            <CustomInput 
-              control={control} name="password" label="Security Key" 
+            <CustomInput
+              control={control} name="password" label="Security Key"
               placeholder="••••••••" icon={Lock} secure={!showPassword}
               rightIcon={showPassword ? Eye : EyeOff}
               onRightIconPress={() => setShowPassword(!showPassword)}
             />
-            
-            <TouchableOpacity 
-              className="h-[60px] rounded-[18px] items-center justify-center mt-3"
-              style={{ backgroundColor: colors.tint, opacity: loading ? 0.7 : 1 }}
+
+            {/* ── Submit ── */}
+            <TouchableOpacity
+              style={{
+                height: 60, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginTop: 4,
+                backgroundColor: colors.tint, opacity: loading ? 0.7 : 1,
+              }}
               onPress={handleSubmit(onSubmit)}
               disabled={loading}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
             >
               {loading ? (
-                <ActivityIndicator color={colors.background} />
+                <ActivityIndicator color="#000" />
               ) : (
-                <Text className="text-[13px] font-black tracking-widest" style={{ color: colors.background }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', letterSpacing: 2, color: '#000' }}>
                   PROVISION ACCOUNT
                 </Text>
               )}
             </TouchableOpacity>
-          </View>
 
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
-<BottomBar role="admin" />
+
+      <BottomBar role="admin" />
     </View>
   );
 }
 
-// 🟢 CustomInput Component (استخدمنا فيه نفس الهوك عشان يبقى لونه ديناميك)
+// ── CustomInput ──────────────────────────────────────────────────────────────
 const CustomInput = ({ control, name, label, placeholder, icon: Icon, secure, rightIcon: RightIcon, onRightIconPress }: any) => {
-  const colors = useThemeColor(); // سحب الألوان جوه الكومبوننت الفرعي
-  
+  const colors = useThemeColor();
   return (
-    <View className="mb-5">
-      <Text className="text-[9px] font-black uppercase tracking-widest mb-2 ml-1" style={{ color: colors.icon }}>
+    <View style={{ marginBottom: 16 }}>
+      <Text style={{
+        fontSize: 9, fontWeight: '800', textTransform: 'uppercase',
+        letterSpacing: 2, marginBottom: 6, marginLeft: 4, color: colors.icon,
+      }}>
         {label}
       </Text>
-      <View 
-        className="flex-row items-center rounded-2xl px-4 h-14 border"
-        style={{ backgroundColor: colors.background, borderColor: colors.border }}
-      >
+      <View style={{
+        flexDirection: 'row', alignItems: 'center',
+        borderRadius: 12, paddingHorizontal: 14, height: 56, borderWidth: 1,
+        backgroundColor: colors.background, borderColor: colors.border,
+      }}>
         <Icon size={16} color={colors.icon} style={{ marginRight: 12 }} />
         <Controller
           control={control}
           name={name}
           render={({ field: { onChange, onBlur, value } }) => (
             <TextInput
-              className="flex-1 text-[13px] font-bold"
-              style={{ color: colors.text }}
+              style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.text }}
               placeholder={placeholder}
               placeholderTextColor={colors.icon}
               secureTextEntry={secure}
@@ -235,7 +244,7 @@ const CustomInput = ({ control, name, label, placeholder, icon: Icon, secure, ri
           )}
         />
         {RightIcon && (
-          <TouchableOpacity onPress={onRightIconPress} className="p-1">
+          <TouchableOpacity onPress={onRightIconPress} style={{ padding: 4 }}>
             <RightIcon size={16} color={colors.icon} />
           </TouchableOpacity>
         )}

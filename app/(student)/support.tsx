@@ -6,8 +6,10 @@ import {
 import {
   HelpCircle, MessageCircle, Send, Check, ChevronDown,
 } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import Api from '../../src/services/api';
 import { useThemeColor } from '../../constants/theme';
+import TopBar from '../../src/components/TopBar';
 
 const FAQS = [
   { q: 'How do I book a trip?',          a: 'Go to Book Trip from the menu, select your route and time slot, then confirm your booking.' },
@@ -33,12 +35,14 @@ interface Ticket {
 
 export default function SupportPage() {
   const colors = useThemeColor();
-  const [openFaq, setOpenFaq]       = useState<number | null>(0);
-  const [subject, setSubject]       = useState('');
-  const [desc, setDesc]             = useState('');
-  const [submitted, setSubmitted]   = useState(false);
-  const [tickets, setTickets]       = useState<Ticket[]>([]);
-  const [loading, setLoading]       = useState(false);
+  const router = useRouter();
+
+  const [openFaq, setOpenFaq]     = useState<number | null>(0);
+  const [subject, setSubject]     = useState('');
+  const [desc, setDesc]           = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [tickets, setTickets]     = useState<Ticket[]>([]);
+  const [loading, setLoading]     = useState(false);
 
   const fetchTickets = async () => {
     try {
@@ -65,139 +69,151 @@ export default function SupportPage() {
     }
   };
 
+  const inputBg = { backgroundColor: colors.background === '#f8f9fa' ? '#f0f1f3' : '#262a33' };
+
   return (
-    <ScrollView
-      style={[s.root, { backgroundColor: colors.background }]}
-      contentContainerStyle={s.scroll}
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={[s.root, { backgroundColor: colors.background }]}>
 
-      {/* FAQ Section */}
-      <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={s.cardHeader}>
-          <View style={[s.iconBox, { backgroundColor: 'rgba(247,160,27,0.1)' }]}>
-            <HelpCircle size={16} color="#f7a01b" />
+      <TopBar
+        title="Support"
+        showMenu
+        showSettings
+        onSettingsPress={() => router.push('/(student)/settings' as any)}
+      />
+
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={s.scroll}
+        showsVerticalScrollIndicator={false}
+      >
+
+        {/* FAQ Section */}
+        <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={s.cardHeader}>
+            <View style={[s.iconBox, { backgroundColor: `${colors.tint}1A` }]}>
+              <HelpCircle size={16} color={colors.tint} />
+            </View>
+            <Text style={[s.cardTitle, { color: colors.text }]}>Frequently Asked Questions</Text>
           </View>
-          <Text style={[s.cardTitle, { color: colors.text }]}>Frequently Asked Questions</Text>
+
+          {FAQS.map((f, i) => (
+            <View key={i} style={[s.faqItem, { borderTopColor: colors.border }]}>
+              <TouchableOpacity
+                style={s.faqQuestion}
+                onPress={() => setOpenFaq(openFaq === i ? null : i)}
+                activeOpacity={0.7}
+              >
+                <Text style={[s.faqQ, { color: colors.text }]}>{f.q}</Text>
+                <ChevronDown
+                  size={13}
+                  color={colors.icon}
+                  style={{ transform: [{ rotate: openFaq === i ? '180deg' : '0deg' }] }}
+                />
+              </TouchableOpacity>
+              {openFaq === i && (
+                <Text style={[s.faqA, { color: colors.icon }]}>{f.a}</Text>
+              )}
+            </View>
+          ))}
         </View>
 
-        {FAQS.map((f, i) => (
-          <View key={i} style={[s.faqItem, { borderTopColor: colors.border }]}>
-            <TouchableOpacity
-              style={s.faqQuestion}
-              onPress={() => setOpenFaq(openFaq === i ? null : i)}
-              activeOpacity={0.7}
-            >
-              <Text style={[s.faqQ, { color: colors.text }]}>{f.q}</Text>
-              <ChevronDown
-                size={13}
-                color={colors.icon}
-                style={{ transform: [{ rotate: openFaq === i ? '180deg' : '0deg' }] }}
-              />
-            </TouchableOpacity>
-            {openFaq === i && (
-              <Text style={[s.faqA, { color: colors.icon }]}>{f.a}</Text>
-            )}
-          </View>
-        ))}
-      </View>
-
-      {/* Submit Ticket */}
-      <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={s.cardHeader}>
-          <View style={[s.iconBox, { backgroundColor: 'rgba(247,160,27,0.1)' }]}>
-            <MessageCircle size={16} color="#f7a01b" />
-          </View>
-          <Text style={[s.cardTitle, { color: colors.text }]}>Submit a Ticket</Text>
-        </View>
-
-        {submitted ? (
-          <View style={s.successWrap}>
-            <View style={s.successIcon}>
-              <Check size={28} color="#22c55e" />
+        {/* Submit Ticket */}
+        <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={s.cardHeader}>
+            <View style={[s.iconBox, { backgroundColor: `${colors.tint}1A` }]}>
+              <MessageCircle size={16} color={colors.tint} />
             </View>
-            <Text style={[s.successTitle, { color: colors.text }]}>Ticket Submitted!</Text>
-            <Text style={[s.successSub, { color: colors.icon }]}>We'll respond within 24 hours.</Text>
-            <TouchableOpacity onPress={() => { setSubmitted(false); setSubject(''); setDesc(''); }}>
-              <Text style={s.successLink}>Send another report</Text>
-            </TouchableOpacity>
+            <Text style={[s.cardTitle, { color: colors.text }]}>Submit a Ticket</Text>
           </View>
-        ) : (
-          <View style={s.formWrap}>
-            <View style={s.fieldWrap}>
-              <Text style={[s.label, { color: colors.icon }]}>SUBJECT</Text>
-              <TextInput
-                style={[s.input, { backgroundColor: colors.background === '#f8f9fa' ? '#f0f1f3' : '#262a33', borderColor: colors.border, color: colors.text }]}
-                placeholder="What's the problem?"
-                placeholderTextColor={colors.icon}
-                value={subject}
-                onChangeText={setSubject}
-              />
-            </View>
-            <View style={s.fieldWrap}>
-              <Text style={[s.label, { color: colors.icon }]}>DESCRIPTION</Text>
-              <TextInput
-                style={[s.input, s.textArea, { backgroundColor: colors.background === '#f8f9fa' ? '#f0f1f3' : '#262a33', borderColor: colors.border, color: colors.text }]}
-                placeholder="Describe the issue in detail..."
-                placeholderTextColor={colors.icon}
-                value={desc}
-                onChangeText={setDesc}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-            </View>
-            <TouchableOpacity
-              style={[s.submitBtn, (!subject.trim() || loading) && s.submitDisabled]}
-              onPress={handleSubmit}
-              disabled={!subject.trim() || loading}
-              activeOpacity={0.85}
-            >
-              {loading
-                ? <ActivityIndicator color="#fff" />
-                : <>
-                    <Send size={15} color="#000" />
-                    <Text style={s.submitText}>Submit Ticket</Text>
-                  </>
-              }
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
 
-      {/* Previous Tickets */}
-      <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[s.sectionTitle, { color: colors.text }]}>PREVIOUS TICKETS</Text>
-        {tickets.length === 0 ? (
-          <Text style={[s.emptyText, { color: colors.icon }]}>You haven't submitted any tickets yet.</Text>
-        ) : (
-          tickets.map(t => {
-            const sc = STATUS_COLORS[t.status] || STATUS_COLORS.pending;
-            return (
-              <View key={t._id} style={[s.ticketRow, { backgroundColor: colors.background === '#f8f9fa' ? '#f0f1f3' : '#262a33', borderColor: colors.border }]}>
-                <View style={s.ticketLeft}>
-                  <Text style={[s.ticketSubject, { color: colors.text }]} numberOfLines={1}>{t.subject}</Text>
-                  <Text style={[s.ticketMeta, { color: colors.icon }]}>
-                    {t._id.slice(-6).toUpperCase()} • {new Date(t.createdAt).toLocaleDateString()}
-                  </Text>
-                </View>
-                <View style={[s.statusBadge, { backgroundColor: sc.bg, borderColor: sc.border }]}>
-                  <Text style={[s.statusText, { color: sc.text }]}>{t.status}</Text>
-                </View>
+          {submitted ? (
+            <View style={s.successWrap}>
+              <View style={s.successIcon}>
+                <Check size={28} color="#22c55e" />
               </View>
-            );
-          })
-        )}
-      </View>
+              <Text style={[s.successTitle, { color: colors.text }]}>Ticket Submitted!</Text>
+              <Text style={[s.successSub, { color: colors.icon }]}>We'll respond within 24 hours.</Text>
+              <TouchableOpacity onPress={() => { setSubmitted(false); setSubject(''); setDesc(''); }}>
+                <Text style={[s.successLink, { color: colors.tint }]}>Send another report</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={s.formWrap}>
+              <View style={s.fieldWrap}>
+                <Text style={[s.label, { color: colors.icon }]}>SUBJECT</Text>
+                <TextInput
+                  style={[s.input, inputBg, { borderColor: colors.border, color: colors.text }]}
+                  placeholder="What's the problem?"
+                  placeholderTextColor={colors.icon}
+                  value={subject}
+                  onChangeText={setSubject}
+                />
+              </View>
+              <View style={s.fieldWrap}>
+                <Text style={[s.label, { color: colors.icon }]}>DESCRIPTION</Text>
+                <TextInput
+                  style={[s.input, s.textArea, inputBg, { borderColor: colors.border, color: colors.text }]}
+                  placeholder="Describe the issue in detail..."
+                  placeholderTextColor={colors.icon}
+                  value={desc}
+                  onChangeText={setDesc}
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                />
+              </View>
+              <TouchableOpacity
+                style={[s.submitBtn, { backgroundColor: colors.tint }, (!subject.trim() || loading) && s.submitDisabled]}
+                onPress={handleSubmit}
+                disabled={!subject.trim() || loading}
+                activeOpacity={0.85}
+              >
+                {loading
+                  ? <ActivityIndicator color="#000" />
+                  : <>
+                      <Send size={15} color="#000" />
+                      <Text style={s.submitText}>Submit Ticket</Text>
+                    </>
+                }
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
 
-      <View style={{ height: 100 }} />
-    </ScrollView>
+        {/* Previous Tickets */}
+        <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[s.sectionTitle, { color: colors.text }]}>PREVIOUS TICKETS</Text>
+          {tickets.length === 0 ? (
+            <Text style={[s.emptyText, { color: colors.icon }]}>You haven't submitted any tickets yet.</Text>
+          ) : (
+            tickets.map(t => {
+              const sc = STATUS_COLORS[t.status] || STATUS_COLORS.pending;
+              return (
+                <View key={t._id} style={[s.ticketRow, inputBg, { borderColor: colors.border }]}>
+                  <View style={s.ticketLeft}>
+                    <Text style={[s.ticketSubject, { color: colors.text }]} numberOfLines={1}>{t.subject}</Text>
+                    <Text style={[s.ticketMeta, { color: colors.icon }]}>
+                      {t._id.slice(-6).toUpperCase()} • {new Date(t.createdAt).toLocaleDateString()}
+                    </Text>
+                  </View>
+                  <View style={[s.statusBadge, { backgroundColor: sc.bg, borderColor: sc.border }]}>
+                    <Text style={[s.statusText, { color: sc.text }]}>{t.status}</Text>
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </View>
+
+        <View style={{ height: 100 }} />
+      </ScrollView>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
   root:          { flex: 1 },
-  scroll:        { padding: 20, gap: 14 },
+  scroll:        { padding: 20, paddingTop: 16, gap: 14 },
 
   card:          { borderWidth: 1, borderRadius: 20, padding: 20 },
   cardHeader:    { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
@@ -213,7 +229,7 @@ const s = StyleSheet.create({
   successIcon:   { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(34,197,94,0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   successTitle:  { fontSize: 15, fontWeight: '700', marginBottom: 4 },
   successSub:    { fontSize: 11, marginBottom: 16 },
-  successLink:   { fontSize: 12, fontWeight: '700', color: '#f7a01b', textDecorationLine: 'underline' },
+  successLink:   { fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },
 
   formWrap:      { gap: 14 },
   fieldWrap:     { gap: 6 },
@@ -221,7 +237,7 @@ const s = StyleSheet.create({
   input:         { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 13 },
   textArea:      { height: 100, paddingTop: 12 },
 
-  submitBtn:     { backgroundColor: '#f7a01b', borderRadius: 14, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  submitBtn:     { borderRadius: 14, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   submitDisabled:{ opacity: 0.5 },
   submitText:    { color: '#000', fontWeight: '700', fontSize: 13 },
 
@@ -235,3 +251,7 @@ const s = StyleSheet.create({
   statusBadge:   { borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
   statusText:    { fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
 });
+import { BOTTOM_BAR_HEIGHT } from '../../src/hooks/useBottomBarHeight';
+
+// في الـ styles
+<View style={{ flex: 1, paddingBottom: BOTTOM_BAR_HEIGHT }}></View>
