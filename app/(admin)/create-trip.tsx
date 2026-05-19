@@ -1,364 +1,334 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
   ActivityIndicator, KeyboardAvoidingView,
   Platform, ScrollView, Modal
 } from "react-native";
 import { router } from "expo-router";
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { MapPin, Bus, Calendar, Users, CheckCircle, Clock, ChevronDown } from "lucide-react-native";
+import { Bus, Users, Clock, CheckCircle, Plus, ChevronDown, Save } from "lucide-react-native";
 import api from "../../src/services/api";
 import { useThemeColor } from "../../constants/theme";
 import TopBar from "../../src/components/TopBar";
 
-const tripSchema = z.object({
-  route_id: z.string().min(1, "Please select a route"),
-  departure_time: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format must be YYYY-MM-DD"),
-  time_slot: z.enum(["morning", "return_1530", "return_1900"]),
-  bus_number: z.string().min(2, "Bus number is required"),
-  total_seats: z.string().min(1, "Total seats are required"),
-});
-
-type TripForm = z.infer<typeof tripSchema>;
-
-interface RouteOption {
-  _id: string;
-  name: string;
+interface BookingSettings {
+  booking_open_hour: number;
+  booking_open_minute: number;
+  booking_close_hour: number;
+  booking_close_minute: number;
 }
 
-export default function CreateTripScreen() {
+export default function CreateBusScreen() {
   const colors = useThemeColor();
-  const [loading, setLoading] = useState(false);
-  const [routesLoading, setRoutesLoading] = useState(true);
-  const [routes, setRoutes] = useState<RouteOption[]>([]);
-  const [routeModalVisible, setRouteModalVisible] = useState(false);
-  const [serverError, setServerError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-
-  const { control, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<TripForm>({
-    resolver: zodResolver(tripSchema),
-    defaultValues: { time_slot: "morning" }
+  
+  // ── States ──
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  
+  const [busForm, setBusForm] = useState({
+    busCode: '',
+    driverName: '',
+    capacity: '45'
   });
 
-  const selectedTimeSlot = watch("time_slot");
-  const selectedRouteId  = watch("route_id");
-  const selectedRouteName = routes.find(r => r._id === selectedRouteId)?.name || "Select a route";
+  const [settings, setSettings] = useState<BookingSettings>({
+    booking_open_hour: 20,
+    booking_open_minute: 0,
+    booking_close_hour: 23,
+    booking_close_minute: 0,
+  });
 
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalState, setModalState] = useState({ type: "success", message: "" });
+
+  // Custom Dropdown State for Times
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [pickerData, setPickerData] = useState<{ options: (number | string)[], type: string }>({ options: [], type: '' });
+
+  // ── Fetch Settings ──
   useEffect(() => {
-    (async () => {
+    const fetchSettings = async () => {
       try {
-        const res = await api.get("/routes");
-        setRoutes(res.data.data || res.data || []);
+        const res = await api.get('/settings');
+        if (res.data?.data?.settings) {
+          setSettings(res.data.data.settings);
+        }
       } catch (err) {
-        console.error("Failed to fetch routes", err);
-      } finally {
-        setRoutesLoading(false);
+        console.log("Failed to fetch settings", err);
       }
-    })();
+    };
+    fetchSettings();
   }, []);
 
-  const onSubmit = async (data: TripForm) => {
-    setLoading(true);
-    setServerError(null);
-    setSuccess(false);
-    try {
-      await api.post("/trips", {
-        route_id:     data.route_id,
-        departure_time: data.departure_time,
-        time_slot:    data.time_slot,
-        bus_number:   data.bus_number,
-        total_seats:  Number(data.total_seats),
-      });
-      setSuccess(true);
-      reset();
-      setTimeout(() => router.back(), 2000);
-    } catch (error: any) {
-      setServerError(error.response?.data?.message || "Failed to create trip. Please try again.");
-    } finally {
-      setLoading(false);
+  // ── Handlers ──
+  const handleCreateBus = async () => {
+    if (!busForm.busCode || !busForm.driverName || !busForm.capacity) {
+      setModalState({ type: "error", message: "Please fill all bus fields." });
+      setModalVisible(true);
+      return;
     }
+
+    setIsSubmitting(true);
+    try {
+      await api.post('/buses', {
+        ...busForm,
+        capacity: parseInt(busForm.capacity) || 45
+      });
+      setModalState({ type: "success", message: "Bus created successfully!" });
+      setBusForm({ busCode: '', driverName: '', capacity: '45' });
+      setModalVisible(true);
+    } catch (err: any) {
+      setModalState({ type: "error", message: err.response?.data?.message || "Failed to create bus." });
+      setModalVisible(true);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    setIsSavingSettings(true);
+    try {
+      await api.put('/settings', settings);
+      setModalState({ type: "success", message: "Booking window updated successfully!" });
+      setModalVisible(true);
+    } catch (err: any) {
+      setModalState({ type: "error", message: err.response?.data?.message || "Failed to save settings." });
+      setModalVisible(true);
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
+  // ── Helpers for 12h/24h format ──
+  const formatHour12 = (h24: number) => {
+    if (h24 === 0) return 12;
+    if (h24 > 12) return h24 - 12;
+    return h24;
+  };
+
+  const getAmPm = (h24: number) => h24 >= 12 ? "PM" : "AM";
+
+  const updateHour = (type: 'open' | 'close', value: number | string) => {
+    if (typeof value === 'string') { // AM or PM
+      const isPM = value === 'PM';
+      setSettings(prev => {
+        const currentH = type === 'open' ? prev.booking_open_hour : prev.booking_close_hour;
+        const h12 = currentH % 12;
+        const newH = isPM ? (h12 === 0 ? 12 : h12 + 12) : (h12 === 0 ? 0 : h12);
+        return { ...prev, [type === 'open' ? 'booking_open_hour' : 'booking_close_hour']: newH };
+      });
+    } else { // Hour number (1-12)
+      setSettings(prev => {
+        const currentH = type === 'open' ? prev.booking_open_hour : prev.booking_close_hour;
+        const isPM = currentH >= 12;
+        const newH = isPM ? (value === 12 ? 12 : value + 12) : (value === 12 ? 0 : value);
+        return { ...prev, [type === 'open' ? 'booking_open_hour' : 'booking_close_hour']: newH };
+      });
+    }
+    setPickerVisible(false);
+  };
+
+  const updateMinute = (type: 'open' | 'close', value: number) => {
+    setSettings(prev => ({ ...prev, [type === 'open' ? 'booking_open_minute' : 'booking_close_minute']: value as number }));
+    setPickerVisible(false);
+  };
+
+  const openPicker = (type: string, options: (number | string)[]) => {
+    setPickerData({ type, options });
+    setPickerVisible(true);
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <TopBar title="Create Trip" showMenu showSettings onSettingsPress={() => router.push('/(admin)/settings' as any)} />
 
-      {/* ── Top Bar ── */}
-   <TopBar
-  title="Create Trip"
-  showMenu
-  showSettings
-  onSettingsPress={() => router.push('/(admin)/settings' as any)}
-/>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
-        <ScrollView
-          contentContainerStyle={{ padding: 20, paddingTop: 16, paddingBottom: 100 }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-
-          {/* ── Card ── */}
-          <View style={{
-            borderWidth: 1, borderRadius: 24, padding: 18,
-            backgroundColor: colors.card, borderColor: colors.border,
-          }}>
-
-            <Text style={{
-              fontSize: 9, fontWeight: '700', letterSpacing: 3,
-              textTransform: 'uppercase', textAlign: 'center',
-              color: colors.icon, marginBottom: 20,
-            }}>
-              Deploy new fleet schedules
-            </Text>
-
-            {/* Alert Messages */}
-            {serverError && (
-              <View style={{
-                borderRadius: 12, padding: 12, marginBottom: 14, borderWidth: 1,
-                backgroundColor: "rgba(239,68,68,0.1)", borderColor: "rgba(239,68,68,0.2)",
-              }}>
-                <Text style={{ fontSize: 11, textAlign: 'center', color: "#ef4444" }}>{serverError}</Text>
+          {/* ── 1. Create Bus Card ── */}
+          <View style={{ borderWidth: 1, borderRadius: 24, padding: 20, backgroundColor: colors.card, borderColor: colors.border, marginBottom: 24 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+              <View style={{ backgroundColor: `${colors.tint}1A`, padding: 10, borderRadius: 14 }}>
+                <Plus size={20} color={colors.tint} />
               </View>
-            )}
-            {success && (
-              <View style={{
-                flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
-                borderRadius: 12, padding: 12, marginBottom: 14, borderWidth: 1,
-                backgroundColor: "rgba(34,197,94,0.1)", borderColor: "rgba(34,197,94,0.2)",
-              }}>
-                <CheckCircle size={16} color="#22c55e" style={{ marginRight: 6 }} />
-                <Text style={{ fontSize: 11, fontWeight: '700', color: "#22c55e" }}>Trip Created Successfully!</Text>
-              </View>
-            )}
-
-            {/* ── Route ── */}
-            <View style={{ marginBottom: 14 }}>
-              <Text style={{ fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6, color: colors.icon }}>
-                SELECT ROUTE
-              </Text>
-              <TouchableOpacity
-                style={{
-                  flexDirection: 'row', alignItems: 'center',
-                  borderRadius: 12, paddingHorizontal: 14, paddingVertical: 14, borderWidth: 1,
-                  backgroundColor: colors.background,
-                  borderColor: errors.route_id ? "#ef4444" : colors.border,
-                }}
-                onPress={() => setRouteModalVisible(true)}
-                disabled={routesLoading}
-                activeOpacity={0.7}
-              >
-                <MapPin size={18} color={colors.icon} />
-                <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', marginLeft: 10, color: selectedRouteId ? colors.text : colors.icon }}>
-                  {routesLoading ? "Loading routes..." : selectedRouteName}
-                </Text>
-                <ChevronDown size={18} color={colors.icon} />
-              </TouchableOpacity>
-              {errors.route_id && (
-                <Text style={{ fontSize: 10, marginTop: 4, color: "#ef4444" }}>{errors.route_id.message}</Text>
-              )}
-            </View>
-
-            {/* ── Route Modal ── */}
-            <Modal
-              visible={routeModalVisible}
-              transparent
-              animationType="slide"
-              onRequestClose={() => setRouteModalVisible(false)}
-            >
-              <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: "rgba(0,0,0,0.7)" }}>
-                <View style={{
-                  borderTopLeftRadius: 32, borderTopRightRadius: 32,
-                  maxHeight: '70%', borderTopWidth: 1,
-                  backgroundColor: colors.card, borderColor: colors.border,
-                }}>
-                  <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                    <Text style={{ fontSize: 16, fontWeight: '900', textAlign: 'center', color: colors.text }}>Select Route</Text>
-                  </View>
-                  <ScrollView showsVerticalScrollIndicator={false}>
-                    {routes.map((r) => (
-                      <TouchableOpacity
-                        key={r._id}
-                        style={{ paddingVertical: 16, paddingHorizontal: 24, borderBottomWidth: 1, borderBottomColor: colors.border }}
-                        onPress={() => { setValue("route_id", r._id, { shouldValidate: true }); setRouteModalVisible(false); }}
-                      >
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>{r.name}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                  <View style={{ padding: 20 }}>
-                    <TouchableOpacity
-                      style={{ paddingVertical: 14, alignItems: 'center', borderRadius: 12, backgroundColor: colors.background }}
-                      onPress={() => setRouteModalVisible(false)}
-                    >
-                      <Text style={{ fontSize: 11, fontWeight: '800', letterSpacing: 2, color: colors.icon }}>CANCEL</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            </Modal>
-
-            {/* ── Date ── */}
-            <View style={{ marginBottom: 14 }}>
-              <Text style={{ fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6, color: colors.icon }}>
-                TRIP DATE (YYYY-MM-DD)
-              </Text>
-              <View style={{
-                flexDirection: 'row', alignItems: 'center',
-                borderRadius: 12, paddingHorizontal: 14, borderWidth: 1,
-                backgroundColor: colors.background,
-                borderColor: errors.departure_time ? "#ef4444" : colors.border,
-              }}>
-                <Calendar size={18} color={colors.icon} />
-                <Controller
-                  control={control}
-                  name="departure_time"
-                  render={({ field: { onChange, value } }) => (
-                    <TextInput
-                      style={{ flex: 1, fontSize: 13, fontWeight: '700', paddingVertical: 14, paddingHorizontal: 10, color: colors.text }}
-                      placeholder="e.g. 2026-05-12"
-                      placeholderTextColor={colors.icon}
-                      value={value}
-                      onChangeText={onChange}
-                      editable={!loading}
-                    />
-                  )}
-                />
-              </View>
-              {errors.departure_time && (
-                <Text style={{ fontSize: 10, marginTop: 4, color: "#ef4444" }}>{errors.departure_time.message}</Text>
-              )}
-            </View>
-
-            {/* ── Time Slot ── */}
-            <View style={{ marginBottom: 14 }}>
-              <Text style={{ fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6, color: colors.icon }}>
-                TIME SLOT
-              </Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {[
-                  { id: "morning",     label: "Morning"  },
-                  { id: "return_1530", label: "03:30 PM" },
-                  { id: "return_1900", label: "07:00 PM" },
-                ].map((slot) => {
-                  const isActive = selectedTimeSlot === slot.id;
-                  return (
-                    <TouchableOpacity
-                      key={slot.id}
-                      style={{
-                        flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                        gap: 6, borderWidth: 1, paddingVertical: 14, borderRadius: 12,
-                        backgroundColor: isActive ? `${colors.tint}1A` : colors.background,
-                        borderColor: isActive ? colors.tint : colors.border,
-                      }}
-                      onPress={() => setValue("time_slot", slot.id as any)}
-                      activeOpacity={0.7}
-                    >
-                      <Clock size={12} color={isActive ? colors.tint : colors.icon} />
-                      <Text style={{ fontSize: 10, fontWeight: '800', letterSpacing: 1, color: isActive ? colors.tint : colors.icon }}>
-                        {slot.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+              <View>
+                <Text style={{ fontSize: 16, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>Create Bus</Text>
+                <Text style={{ fontSize: 10, fontWeight: '700', color: colors.icon }}>ADD NEW VEHICLES TO FLEET</Text>
               </View>
             </View>
 
-            {/* ── Bus Number & Seats ── */}
-            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 6 }}>
-
-              {/* Bus Number */}
-              <View style={{ flex: 1.5 }}>
-                <Text style={{ fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6, color: colors.icon }}>
-                  BUS NUMBER
-                </Text>
-                <View style={{
-                  flexDirection: 'row', alignItems: 'center',
-                  borderRadius: 12, paddingHorizontal: 14, borderWidth: 1,
-                  backgroundColor: colors.background,
-                  borderColor: errors.bus_number ? "#ef4444" : colors.border,
-                }}>
+            {/* Bus Fields */}
+            <View style={{ gap: 16 }}>
+              <View>
+                <Text style={{ fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6, color: colors.icon }}>Bus Number / Plate</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, paddingHorizontal: 14, borderWidth: 1, backgroundColor: colors.background, borderColor: colors.border }}>
                   <Bus size={18} color={colors.icon} />
-                  <Controller
-                    control={control}
-                    name="bus_number"
-                    render={({ field: { onChange, value } }) => (
-                      <TextInput
-                        style={{ flex: 1, fontSize: 13, fontWeight: '700', paddingVertical: 14, paddingHorizontal: 10, color: colors.text }}
-                        placeholder="e.g. Bus 101"
-                        placeholderTextColor={colors.icon}
-                        value={value}
-                        onChangeText={onChange}
-                        editable={!loading}
-                      />
-                    )}
+                  <TextInput
+                    style={{ flex: 1, fontSize: 13, fontWeight: '700', paddingVertical: 14, paddingHorizontal: 10, color: colors.text }}
+                    placeholder="e.g. Bus 101"
+                    placeholderTextColor={colors.icon}
+                    value={busForm.busCode}
+                    onChangeText={(t) => setBusForm(prev => ({ ...prev, busCode: t }))}
                   />
                 </View>
-                {errors.bus_number && (
-                  <Text style={{ fontSize: 10, marginTop: 4, color: "#ef4444" }}>{errors.bus_number.message}</Text>
-                )}
               </View>
 
-              {/* Total Seats */}
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6, color: colors.icon }}>
-                  SEATS
-                </Text>
-                <View style={{
-                  flexDirection: 'row', alignItems: 'center',
-                  borderRadius: 12, paddingHorizontal: 14, borderWidth: 1,
-                  backgroundColor: colors.background,
-                  borderColor: errors.total_seats ? "#ef4444" : colors.border,
-                }}>
+              <View>
+                <Text style={{ fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6, color: colors.icon }}>Driver Name</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, paddingHorizontal: 14, borderWidth: 1, backgroundColor: colors.background, borderColor: colors.border }}>
                   <Users size={18} color={colors.icon} />
-                  <Controller
-                    control={control}
-                    name="total_seats"
-                    render={({ field: { onChange, value } }) => (
-                      <TextInput
-                        style={{ flex: 1, fontSize: 13, fontWeight: '700', paddingVertical: 14, paddingHorizontal: 10, color: colors.text }}
-                        placeholder="40"
-                        placeholderTextColor={colors.icon}
-                        keyboardType="numeric"
-                        value={value}
-                        onChangeText={onChange}
-                        editable={!loading}
-                      />
-                    )}
+                  <TextInput
+                    style={{ flex: 1, fontSize: 13, fontWeight: '700', paddingVertical: 14, paddingHorizontal: 10, color: colors.text }}
+                    placeholder="e.g. Ahmed Ali"
+                    placeholderTextColor={colors.icon}
+                    value={busForm.driverName}
+                    onChangeText={(t) => setBusForm(prev => ({ ...prev, driverName: t }))}
                   />
                 </View>
-                {errors.total_seats && (
-                  <Text style={{ fontSize: 10, marginTop: 4, color: "#ef4444" }}>{errors.total_seats.message}</Text>
-                )}
+              </View>
+
+              <View>
+                <Text style={{ fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6, color: colors.icon }}>Total Seats Capacity</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, paddingHorizontal: 14, borderWidth: 1, backgroundColor: colors.background, borderColor: colors.border }}>
+                  <Users size={18} color={colors.icon} />
+                  <TextInput
+                    style={{ flex: 1, fontSize: 13, fontWeight: '700', paddingVertical: 14, paddingHorizontal: 10, color: colors.text }}
+                    placeholder="45"
+                    keyboardType="numeric"
+                    placeholderTextColor={colors.icon}
+                    value={busForm.capacity}
+                    onChangeText={(t) => setBusForm(prev => ({ ...prev, capacity: t }))}
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                onPress={handleCreateBus}
+                disabled={isSubmitting}
+                style={{ borderRadius: 16, paddingVertical: 16, alignItems: 'center', marginTop: 10, backgroundColor: colors.tint, opacity: isSubmitting ? 0.7 : 1 }}
+              >
+                {isSubmitting ? <ActivityIndicator color="#000" /> : <Text style={{ fontSize: 12, fontWeight: '900', letterSpacing: 2, textTransform: 'uppercase', color: '#000' }}>Create Bus</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* ── 2. Booking Window Settings Card ── */}
+          <View style={{ borderWidth: 1, borderRadius: 24, padding: 20, backgroundColor: colors.card, borderColor: colors.border }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+              <View style={{ backgroundColor: `${colors.tint}1A`, padding: 10, borderRadius: 14 }}>
+                <Clock size={20} color={colors.tint} />
+              </View>
+              <View>
+                <Text style={{ fontSize: 16, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>Booking Window</Text>
+                <Text style={{ fontSize: 10, fontWeight: '700', color: colors.icon }}>CONTROL REGISTRATION TIMES</Text>
               </View>
             </View>
 
-            {/* ── Submit ── */}
-            <TouchableOpacity
-              style={{
-                borderRadius: 20, paddingVertical: 18, alignItems: 'center', marginTop: 20,
-                backgroundColor: colors.tint, opacity: loading ? 0.7 : 1,
-              }}
-              onPress={handleSubmit(onSubmit)}
-              disabled={loading}
-              activeOpacity={0.85}
-            >
-              {loading ? (
-                <ActivityIndicator color="#000" />
-              ) : (
-                <Text style={{ fontSize: 13, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', color: '#000' }}>
-                  Create Schedule
+            {/* Time Pickers */}
+            {(['open', 'close'] as const).map((type) => (
+              <View key={type} style={{ marginBottom: 20 }}>
+                <Text style={{ fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8, color: colors.icon }}>
+                  Booking {type === 'open' ? 'Opens At' : 'Closes At'}
                 </Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  
+                  {/* Hour */}
+                  <TouchableOpacity onPress={() => openPicker(`${type}Hour`, [12,1,2,3,4,5,6,7,8,9,10,11])}
+                    style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, padding: 14, borderRadius: 14 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>{String(formatHour12(type === 'open' ? settings.booking_open_hour : settings.booking_close_hour)).padStart(2, '0')}</Text>
+                    <ChevronDown size={14} color={colors.icon} />
+                  </TouchableOpacity>
+
+                  {/* Minute */}
+                  <TouchableOpacity onPress={() => openPicker(`${type}Minute`, [0, 15, 30, 45])}
+                    style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, padding: 14, borderRadius: 14 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>{String(type === 'open' ? settings.booking_open_minute : settings.booking_close_minute).padStart(2, '0')}</Text>
+                    <ChevronDown size={14} color={colors.icon} />
+                  </TouchableOpacity>
+
+                  {/* AM/PM */}
+                  <TouchableOpacity onPress={() => openPicker(`${type}Period`, ['AM', 'PM'])}
+                    style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.tint, padding: 14, borderRadius: 14 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '900', color: colors.tint }}>{getAmPm(type === 'open' ? settings.booking_open_hour : settings.booking_close_hour)}</Text>
+                    <ChevronDown size={14} color={colors.tint} />
+                  </TouchableOpacity>
+                </View>
+                <Text style={{ fontSize: 10, fontWeight: '800', marginTop: 8, color: type === 'open' ? (colors.success || '#22c55e') : '#ef4444' }}>
+                  {type === 'open' ? 'OPENS:' : 'CLOSES:'} {formatHour12(type === 'open' ? settings.booking_open_hour : settings.booking_close_hour)}:{String(type === 'open' ? settings.booking_open_minute : settings.booking_close_minute).padStart(2, '0')} {getAmPm(type === 'open' ? settings.booking_open_hour : settings.booking_close_hour)}
+                </Text>
+              </View>
+            ))}
+
+            <TouchableOpacity
+              onPress={handleSaveSettings}
+              disabled={isSavingSettings}
+              style={{ borderRadius: 16, paddingVertical: 16, alignItems: 'center', marginTop: 4, flexDirection: 'row', justifyContent: 'center', gap: 8, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.tint, opacity: isSavingSettings ? 0.7 : 1 }}
+            >
+              {isSavingSettings ? <ActivityIndicator color={colors.tint} /> : (
+                <>
+                  <Save size={16} color={colors.tint} />
+                  <Text style={{ fontSize: 12, fontWeight: '900', letterSpacing: 2, textTransform: 'uppercase', color: colors.tint }}>Save Settings</Text>
+                </>
               )}
             </TouchableOpacity>
-
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* ── Success/Error Modal (Mimics Web) ── */}
+      <Modal visible={modalVisible} transparent animationType="fade">
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: "rgba(0,0,0,0.6)", padding: 20 }}>
+          <View style={{ width: '100%', maxWidth: 320, backgroundColor: colors.card, borderRadius: 24, padding: 24, borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}>
+            <View style={{ width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', marginBottom: 16, borderWidth: 2,
+              backgroundColor: modalState.type === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+              borderColor: modalState.type === 'success' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'
+            }}>
+              {modalState.type === 'success' ? <CheckCircle size={32} color="#22c55e" /> : <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#ef4444' }}>!</Text>}
+            </View>
+            <Text style={{ fontSize: 18, fontWeight: '900', textTransform: 'uppercase', color: colors.text, marginBottom: 8 }}>
+              {modalState.type === 'success' ? 'Success!' : 'Action Failed'}
+            </Text>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.icon, textAlign: 'center', marginBottom: 24 }}>{modalState.message}</Text>
+            
+            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
+              <TouchableOpacity onPress={() => setModalVisible(false)} style={{ flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase', color: colors.text }}>Close</Text>
+              </TouchableOpacity>
+              {modalState.type === 'success' && (
+                <TouchableOpacity onPress={() => { setModalVisible(false); router.push('/(admin)/dashboard' as any); }} style={{ flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: colors.tint, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase', color: '#000' }}>Dashboard</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Custom Dropdown Picker Modal ── */}
+      <Modal visible={pickerVisible} transparent animationType="slide">
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: "rgba(0,0,0,0.5)" }}>
+          <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 40, maxHeight: '50%' }}>
+            <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' }}>
+              <Text style={{ fontSize: 12, fontWeight: '900', textTransform: 'uppercase', color: colors.icon }}>Select Option</Text>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {pickerData.options.map((opt, i) => (
+                <TouchableOpacity key={i} style={{ padding: 18, borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' }}
+                  onPress={() => {
+                    const isOpen = pickerData.type.startsWith('open');
+                    if (pickerData.type.includes('Hour') || pickerData.type.includes('Period')) updateHour(isOpen ? 'open' : 'close', opt);
+                    if (pickerData.type.includes('Minute')) updateMinute(isOpen ? 'open' : 'close', opt as number);
+                  }}>
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>{String(opt).padStart(2, '0')}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity onPress={() => setPickerVisible(false)} style={{ padding: 16, alignItems: 'center', marginTop: 10 }}>
+              <Text style={{ fontSize: 12, fontWeight: '900', color: '#ef4444', textTransform: 'uppercase' }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }

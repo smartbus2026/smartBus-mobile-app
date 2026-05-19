@@ -1,405 +1,345 @@
-import BottomBar from "@/src/components/sidebar";
-import { ChevronDown, Users, X } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useRouter } from "expo-router";
 import {
-    ActivityIndicator, Modal,
-    ScrollView,
-    Text, TouchableOpacity,
-    View
+  Calendar,
+  CheckCircle,
+  Clock,
+  Filter,
+  MapPin,
+  Users,
+  X,
+  Bus
+} from "lucide-react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Modal,
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { useThemeColor } from "../../constants/theme";
 import api from "../../src/services/api";
 import TopBar from "../../src/components/TopBar";
-import { useRouter } from "expo-router";
-interface Booking {
-  _id: string;
-  user: { name: string; email: string };
-  trip: { _id: string; time_slot: string; route?: { name: string }; date: string };
-  seat_number: number;
-  attended: boolean;
-  status: string;
+
+interface DashboardData {
+  totalUsers: number;
+  totalTrips: number;
+  activeTrips: number;
+  totalBookings: number;
 }
 
-interface TripInfo {
-  _id: string;
-  date: string;
-  time_slot: string;
-  route?: { name: string };
-  total_seats: number;
-  booked_seats: number;
-}
-
-const TIME_SLOT_LABEL: Record<string, string> = {
-  morning: "Morning",
-  return_1530: "3:30 PM",
-  return_1900: "7:00 PM",
-};
-
-const FILTERS = ["all", "present", "absent", "pending"] as const;
-
-export default function AdminReports() {
+export default function AdminReportsScreen() {
   const colors = useThemeColor();
-  const [attendance, setAttendance]       = useState<any>(null);
-  const [allBookings, setAllBookings]     = useState<Booking[]>([]);
-  const [allTrips, setAllTrips]           = useState<TripInfo[]>([]);
-  const [totalUsers, setTotalUsers]       = useState(0);
-  const [loading, setLoading]             = useState(true);
-  const [selectedDate, setSelectedDate]   = useState<string>("all");
-  const [selectedTripId, setSelectedTripId] = useState<string>("all");
-  const [filter, setFilter]               = useState<typeof FILTERS[number]>("all");
-  const [dateModalVisible, setDateModalVisible] = useState(false);
-  const [tripModalVisible, setTripModalVisible] = useState(false);
-  const [closingTrip, setClosingTrip]     = useState<string | null>(null);
-  const [closeModal, setCloseModal]       = useState(false);
-const router = useRouter();
-  const fetchAll = async () => {
-    setLoading(true);
-    try {
-      const [dashRes, bookingsRes, tripsRes] = await Promise.all([
-        api.get("/reports/dashboard-stats"),
-        api.get("/bookings"),
-        api.get("/trips"),
-      ]);
-      setTotalUsers(dashRes.data.totalUsers || 0);
-      const bookings = bookingsRes.data.data?.bookings || bookingsRes.data || [];
-      const trips    = tripsRes.data.data || tripsRes.data || [];
-      setAllBookings(Array.isArray(bookings) ? bookings : []);
-      setAllTrips(Array.isArray(trips) ? trips : []);
+  const router = useRouter();
 
-      const active   = bookings.filter((b: Booking) => b.status !== "cancelled");
-      const present  = active.filter((b: Booking) => b.attended).length;
-      const absent   = active.filter((b: Booking) => b.status === "missed").length;
-      const pending  = active.filter((b: Booking) => !b.attended && b.status !== "missed").length;
-      const total    = active.length || 1;
-      setAttendance({
-        present, absent, pending, total,
-        presentPct: Math.round(present / total * 100),
-        absentPct:  Math.round(absent  / total * 100),
-        pendingPct: Math.round(pending / total * 100),
-      });
-    } catch (e) {
-      console.error(e);
+  // ── Dashboard State ──
+  const [dashData, setDashData] = useState<DashboardData | null>(null);
+  const [isDashLoading, setIsDashLoading] = useState(true);
+
+  // ── Attendance Report State ──
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [filters, setFilters] = useState({ date: todayStr, routeId: '', busId: '', timeSlot: '', specificReturnTime: '' });
+  const [tempFilters, setTempFilters] = useState(filters);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+
+  const [routes, setRoutes] = useState<any[]>([]);
+  const [buses, setBuses] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [stats, setStats] = useState({ completed: 0, missed: 0, total: 0, rate: 0 });
+  const [isReportLoading, setIsReportLoading] = useState(false);
+
+  // 1. Fetch Dashboard Stats & Dropdown Options
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        const [dashRes, rRes, bRes] = await Promise.all([
+          api.get('/reports/dashboard-stats'),
+          api.get('/routes').catch(() => ({ data: { data: [] } })),
+          api.get('/tracking/buses').catch(() => ({ data: { data: { buses: [] } } }))
+        ]);
+        setDashData(dashRes.data);
+        setRoutes(rRes.data?.data || rRes.data || []);
+        setBuses(bRes.data?.data?.buses || bRes.data?.buses || bRes.data?.data || []);
+      } catch (err) {
+        console.log("Failed to fetch initial data", err);
+      } finally {
+        setIsDashLoading(false);
+      }
+    };
+    fetchInitialData();
+  }, []);
+
+  // 2. Fetch Attendance Report
+  const fetchReport = useCallback(async () => {
+    setIsReportLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (filters.date) params.set('date', filters.date);
+      if (filters.routeId) params.set('routeId', filters.routeId);
+      if (filters.busId) params.set('busId', filters.busId);
+      if (filters.timeSlot) params.set('timeSlot', filters.timeSlot);
+      if (filters.timeSlot === 'Return' && filters.specificReturnTime) {
+        params.set('specificReturnTime', filters.specificReturnTime);
+      }
+
+      const res = await api.get(`/reports/attendance?${params.toString()}`);
+      setBookings(res.data?.data?.bookings || []);
+      setStats(res.data?.data?.stats || { completed: 0, missed: 0, total: 0, rate: 0 });
+    } catch (err) {
+      console.log('Failed to fetch attendance report', err);
+      setBookings([]);
     } finally {
-      setLoading(false);
+      setIsReportLoading(false);
     }
+  }, [filters]);
+
+  useEffect(() => {
+    fetchReport();
+  }, [fetchReport]);
+
+  // ── Handlers ──
+  const applyFilters = () => {
+    setFilters(tempFilters);
+    setIsFilterModalOpen(false);
   };
 
-  useEffect(() => { fetchAll(); }, []);
-
-  const handleCloseTrip = async () => {
-    if (!selectedTripId || selectedTripId === "all") return;
-    setClosingTrip(selectedTripId);
-    try {
-      await api.patch(`/bookings/trip/${selectedTripId}/close`);
-      await fetchAll();
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setClosingTrip(null);
-      setCloseModal(false);
-    }
+  const clearFilters = () => {
+    const cleared = { date: todayStr, routeId: '', busId: '', timeSlot: '', specificReturnTime: '' };
+    setTempFilters(cleared);
+    setFilters(cleared);
+    setIsFilterModalOpen(false);
   };
 
-  const uniqueDates = [...new Set(allTrips.map(t => t.date.slice(0, 10)))].sort().reverse();
+  const activeFiltersCount = Object.values(filters).filter(v => v !== '' && v !== todayStr).length + (filters.date ? 1 : 0);
 
-  const tripsForDate = selectedDate === "all"
-    ? allTrips
-    : allTrips.filter(t => t.date.slice(0, 10) === selectedDate);
-
-  const bookingsForSelection = allBookings.filter(b => {
-    if (b.status === "cancelled") return false;
-    if (selectedDate !== "all" && b.trip?.date?.slice(0, 10) !== selectedDate) return false;
-    if (selectedTripId !== "all" && b.trip?._id !== selectedTripId) return false;
-    return true;
-  });
-
-  const filteredBookings = bookingsForSelection.filter(b => {
-    if (filter === "present") return b.attended;
-    if (filter === "absent")  return b.status === "missed";
-    if (filter === "pending") return !b.attended && b.status !== "missed";
-    return true;
-  });
-
-  const pendingCount     = bookingsForSelection.filter(b => !b.attended && b.status !== "missed").length;
-  const selectedTripInfo = allTrips.find(t => t._id === selectedTripId);
-
-  if (loading) {
+  if (isDashLoading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color={colors.tint} />
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <TopBar title="System Reports" showMenu showSettings onSettingsPress={() => router.push('/(admin)/settings' as any)} />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.tint} />
+          <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginTop: 12, color: colors.icon }}>Loading Dashboard...</Text>
+        </View>
       </View>
     );
   }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <TopBar title="System Reports" showMenu showSettings onSettingsPress={() => router.push('/(admin)/settings' as any)} />
 
-      {/* ── Top Bar ── */}
-      
-<TopBar
-        title="Reports"
-  showMenu
-  showSettings
-  onSettingsPress={() => router.push('/(admin)/settings' as any)}
-/>
-      <ScrollView
-        contentContainerStyle={{ padding: 20, paddingTop: 16, paddingBottom: 120 }}
-        showsVerticalScrollIndicator={false}
-      >
-
-        {/* ── Welcome ── */}
-        <Text style={{ fontSize: 22, fontWeight: '800', textTransform: 'uppercase', letterSpacing: -0.5, marginBottom: 20, color: colors.text }}>
-          System Reports
-        </Text>
-
-        {/* ── Stats Grid ── */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 20 }}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+        
+        {/* ── Dashboard Stats ── */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 24 }}>
           {[
-            { title: "Total Students", value: totalUsers,               color: colors.tint,              pct: 100 },
-            { title: "Present",        value: attendance?.present ?? 0, color: colors.success || "#22c55e", pct: attendance?.presentPct ?? 0 },
-            { title: "Absent",         value: attendance?.absent  ?? 0, color: colors.error  || "#ef4444", pct: attendance?.absentPct  ?? 0 },
-            { title: "Pending",        value: attendance?.pending ?? 0, color: colors.icon,              pct: attendance?.pendingPct ?? 0 },
+            { title: "Total Students", value: dashData?.totalUsers || 0,    icon: <Users size={20} color={colors.tint} /> },
+            { title: "Total Trips",    value: dashData?.totalTrips || 0,    icon: <MapPin size={20} color={colors.success || '#22c55e'} /> },
+            { title: "Active Trips",   value: dashData?.activeTrips || 0,   icon: <Clock size={20} color={colors.text} /> },
+            { title: "Total Bookings", value: dashData?.totalBookings || 0, icon: <CheckCircle size={20} color={colors.icon} /> },
           ].map((s, i) => (
-            <View key={i} style={{
-              width: '48%', borderRadius: 24, padding: 16, marginBottom: 12, borderWidth: 1,
-              backgroundColor: colors.card, borderColor: colors.border,
-            }}>
-              <Text style={{ fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 8, color: colors.icon }}>
-                {s.title}
-              </Text>
-              <Text style={{ fontSize: 30, fontWeight: '800', marginBottom: 8, color: s.color }}>{s.value}</Text>
-              <View style={{ height: 4, borderRadius: 99, overflow: 'hidden', marginBottom: 4, backgroundColor: colors.background }}>
-                <View style={{ height: '100%', borderRadius: 99, width: `${s.pct}%`, backgroundColor: s.color }} />
+            <View key={i} style={{ width: '48%', borderRadius: 20, padding: 16, marginBottom: 12, borderWidth: 1, backgroundColor: colors.card, borderColor: colors.border }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                <Text style={{ fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: colors.icon, flex: 1, paddingRight: 4 }}>{s.title}</Text>
+                <View style={{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}>
+                  {s.icon}
+                </View>
               </View>
-              <Text style={{ fontSize: 9, fontWeight: '800', color: s.color }}>{s.pct}%</Text>
+              <Text style={{ fontSize: 24, fontWeight: '900', color: colors.text }}>{s.value}</Text>
             </View>
           ))}
         </View>
 
-        {/* ── Attendance Card ── */}
-        <View style={{ borderRadius: 28, padding: 20, borderWidth: 1, marginBottom: 16, backgroundColor: colors.card, borderColor: colors.border }}>
-          <Text style={{ fontSize: 14, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4, color: colors.text }}>
-            Attendance Management
-          </Text>
-          <Text style={{ fontSize: 10, fontWeight: '700', marginBottom: 16, color: colors.icon }}>
-            {bookingsForSelection.length} students · {bookingsForSelection.filter(b => b.attended).length} present · {pendingCount} pending
-          </Text>
-
-          {/* Dropdown Filters */}
-          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
-            <TouchableOpacity
-              style={{
-                flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1,
-                backgroundColor: colors.background, borderColor: colors.border,
-              }}
-              onPress={() => setDateModalVisible(true)}
+        {/* ── Attendance Report Panel ── */}
+        <View style={{ borderRadius: 24, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, overflow: 'hidden' }}>
+          
+          {/* Header & Filter Trigger */}
+          <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: 'rgba(0,0,0,0.02)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>Attendance Report</Text>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: colors.icon, marginTop: 4 }}>{stats.total} records found</Text>
+            </View>
+            <TouchableOpacity 
+              onPress={() => setIsFilterModalOpen(true)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: 1, backgroundColor: activeFiltersCount > 0 ? colors.tint : colors.background, borderColor: activeFiltersCount > 0 ? colors.tint : colors.border }}
             >
-              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text }} numberOfLines={1}>
-                {selectedDate === "all" ? "All Dates" : selectedDate}
+              <Filter size={14} color={activeFiltersCount > 0 ? '#000' : colors.text} />
+              <Text style={{ fontSize: 10, fontWeight: '900', textTransform: 'uppercase', color: activeFiltersCount > 0 ? '#000' : colors.text }}>
+                Filters {activeFiltersCount > 0 ? `(${activeFiltersCount})` : ''}
               </Text>
-              <ChevronDown size={14} color={colors.icon} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={{
-                flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1,
-                backgroundColor: colors.background, borderColor: colors.border,
-              }}
-              onPress={() => setTripModalVisible(true)}
-            >
-              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text }} numberOfLines={1}>
-                {selectedTripId === "all" ? "All Trips" : TIME_SLOT_LABEL[selectedTripInfo?.time_slot || ""] || "Trip"}
-              </Text>
-              <ChevronDown size={14} color={colors.icon} />
             </TouchableOpacity>
           </View>
 
-          {/* Status Tabs */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-            {FILTERS.map((f) => {
-              const count = f === "all"     ? bookingsForSelection.length
-                : f === "present" ? bookingsForSelection.filter(b => b.attended).length
-                : f === "absent"  ? bookingsForSelection.filter(b => b.status === "missed").length
-                : pendingCount;
-              const isActive = filter === f;
-              return (
-                <TouchableOpacity
-                  key={f}
-                  style={{
-                    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, marginRight: 8, borderWidth: 1,
-                    backgroundColor: isActive ? `${colors.tint}1A` : colors.background,
-                    borderColor: isActive ? colors.tint : colors.border,
-                  }}
-                  onPress={() => setFilter(f)}
-                >
-                  <Text style={{ fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: isActive ? colors.tint : colors.icon }}>
-                    {f} ({count})
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-
-          {/* End Trip Action */}
-          {selectedTripId !== "all" && pendingCount > 0 && (
-            <TouchableOpacity
-              style={{
-                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-                borderRadius: 18, paddingVertical: 14, marginBottom: 16,
-                backgroundColor: colors.error || "#ef4444",
-              }}
-              onPress={() => setCloseModal(true)}
-            >
-              <X size={14} color="#fff" />
-              <Text style={{ fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: '#fff' }}>
-                End Trip · Mark {pendingCount} Absent
-              </Text>
-            </TouchableOpacity>
-          )}
+          {/* Report Stats Row */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.background }}>
+            {[
+              { label: 'Total',     value: stats.total,     color: colors.text, bg: colors.background },
+              { label: 'Completed', value: stats.completed, color: colors.success || '#22c55e', bg: `${colors.success || '#22c55e'}1A` },
+              { label: 'Missed',    value: stats.missed,    color: colors.error || '#ef4444', bg: `${colors.error || '#ef4444'}1A` },
+              { label: 'Rate',      value: `${stats.rate}%`,color: stats.rate >= 75 ? (colors.success || '#22c55e') : (colors.error || '#ef4444'), bg: colors.background },
+            ].map((s, i) => (
+              <View key={i} style={{ width: '25%', padding: 12, alignItems: 'center', backgroundColor: s.bg, borderRightWidth: i !== 3 ? 1 : 0, borderRightColor: colors.border }}>
+                <Text style={{ fontSize: 8, fontWeight: '900', textTransform: 'uppercase', color: colors.icon, marginBottom: 4 }}>{s.label}</Text>
+                <Text style={{ fontSize: 14, fontWeight: '900', color: s.color }}>{s.value}</Text>
+              </View>
+            ))}
+          </View>
 
           {/* Bookings List */}
-          {filteredBookings.length === 0 ? (
-            <View style={{ alignItems: 'center', paddingVertical: 40, gap: 12 }}>
-              <Users size={32} color={colors.border} />
-              <Text style={{ fontSize: 11, fontWeight: '700', textTransform: 'uppercase', color: colors.icon }}>No students found</Text>
-            </View>
-          ) : (
-            filteredBookings.map((b) => (
-              <View
-                key={b._id}
-                style={{
-                  flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                  paddingVertical: 14, borderBottomWidth: 1, borderLeftWidth: 4, paddingLeft: 12,
-                  borderBottomColor: colors.border,
-                  borderLeftColor: b.attended ? (colors.success || "#22c55e") : b.status === "missed" ? (colors.error || "#ef4444") : colors.tint,
-                }}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>{b.user?.name || "—"}</Text>
-                  <Text style={{ fontSize: 10, fontWeight: '700', marginBottom: 4, color: colors.icon }}>{b.user?.email || "—"}</Text>
-                  <Text style={{ fontSize: 10, fontWeight: '500', color: colors.icon }}>
-                    {b.trip?.route?.name || "—"} · Seat #{b.seat_number}
-                  </Text>
-                </View>
-                <View style={{
-                  borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1,
-                  backgroundColor: b.attended ? "rgba(34,197,94,0.1)" : b.status === "missed" ? "rgba(239,68,68,0.1)" : "rgba(247,160,27,0.1)",
-                  borderColor:     b.attended ? "rgba(34,197,94,0.2)" : b.status === "missed" ? "rgba(239,68,68,0.2)" : "rgba(247,160,27,0.2)",
-                }}>
-                  <Text style={{
-                    fontSize: 8, fontWeight: '800',
-                    color: b.attended ? (colors.success || "#22c55e") : b.status === "missed" ? (colors.error || "#ef4444") : colors.tint,
-                  }}>
-                    {b.attended ? "PRESENT" : b.status === "missed" ? "ABSENT" : "PENDING"}
-                  </Text>
-                </View>
+          <View style={{ padding: 12 }}>
+            {isReportLoading ? (
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                <ActivityIndicator color={colors.tint} />
+                <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginTop: 12, color: colors.icon }}>Syncing Data...</Text>
               </View>
-            ))
-          )}
-        </View>
+            ) : bookings.length === 0 ? (
+              <View style={{ paddingVertical: 40, alignItems: 'center', opacity: 0.5 }}>
+                <Users size={32} color={colors.icon} style={{ marginBottom: 12 }} />
+                <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>No records match filters</Text>
+              </View>
+            ) : (
+              bookings.map((b: any) => {
+                const isCompleted = b.attendanceStatus === 'completed';
+                return (
+                  <View key={b._id} style={{ flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border, borderLeftWidth: 3, borderLeftColor: isCompleted ? (colors.success || '#22c55e') : (colors.error || '#ef4444'), backgroundColor: colors.background, marginBottom: 8, borderRadius: 12 }}>
+                    
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '900', color: colors.text, marginBottom: 2 }}>{b.user?.name || '—'}</Text>
+                      <Text style={{ fontSize: 10, color: colors.icon, marginBottom: 8 }}>{b.user?.email || '—'}</Text>
+                      
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <MapPin size={10} color={colors.tint} />
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.icon }}>{b.route?.name || '—'}</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Bus size={10} color={colors.text} />
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text }}>{b.busId?.busCode || '—'}</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Clock size={10} color={colors.icon} />
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.icon }}>{b.timeSlot} {b.specificReturnTime ? `(${b.specificReturnTime})` : ''}</Text>
+                        </View>
+                      </View>
+                    </View>
 
+                    <View style={{ backgroundColor: isCompleted ? `${colors.success || '#22c55e'}1A` : `${colors.error || '#ef4444'}1A`, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: isCompleted ? `${colors.success || '#22c55e'}33` : `${colors.error || '#ef4444'}33` }}>
+                      <Text style={{ fontSize: 9, fontWeight: '900', textTransform: 'uppercase', color: isCompleted ? (colors.success || '#22c55e') : (colors.error || '#ef4444') }}>
+                        {isCompleted ? 'Present' : 'Missed'}
+                      </Text>
+                    </View>
+
+                  </View>
+                );
+              })
+            )}
+          </View>
+        </View>
       </ScrollView>
 
-      {/* ── Date Modal ── */}
-      <Modal visible={dateModalVisible} transparent animationType="slide">
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: "rgba(0,0,0,0.7)" }}>
-          <View style={{ borderTopLeftRadius: 32, borderTopRightRadius: 32, maxHeight: '70%', padding: 24, backgroundColor: colors.card }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <Text style={{ fontSize: 18, fontWeight: '900', color: colors.text }}>Select Date</Text>
-              <TouchableOpacity onPress={() => setDateModalVisible(false)} style={{ padding: 4 }}>
+      {/* ── Filters Bottom Sheet Modal ── */}
+      <Modal visible={isFilterModalOpen} transparent animationType="slide">
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: "rgba(0,0,0,0.6)" }}>
+          <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 32, borderTopRightRadius: 32, maxHeight: '85%', paddingBottom: Platform.OS === 'ios' ? 40 : 20 }}>
+            
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 24, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+              <Text style={{ fontSize: 16, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>Report Filters</Text>
+              <TouchableOpacity onPress={() => setIsFilterModalOpen(false)} style={{ padding: 8, borderRadius: 12, backgroundColor: colors.background }}>
                 <X size={20} color={colors.text} />
               </TouchableOpacity>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <TouchableOpacity
-                style={{ paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}
-                onPress={() => { setSelectedDate("all"); setSelectedTripId("all"); setDateModalVisible(false); }}
-              >
-                <Text style={{ fontWeight: '700', color: selectedDate === "all" ? colors.tint : colors.text }}>All Dates</Text>
-              </TouchableOpacity>
-              {uniqueDates.map((d) => (
-                <TouchableOpacity
-                  key={d}
-                  style={{ paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}
-                  onPress={() => { setSelectedDate(d); setSelectedTripId("all"); setDateModalVisible(false); }}
-                >
-                  <Text style={{ fontWeight: '700', color: selectedDate === d ? colors.tint : colors.text }}>{d}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
 
-      {/* ── Trip Modal ── */}
-      <Modal visible={tripModalVisible} transparent animationType="slide">
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: "rgba(0,0,0,0.7)" }}>
-          <View style={{ borderTopLeftRadius: 32, borderTopRightRadius: 32, maxHeight: '70%', padding: 24, backgroundColor: colors.card }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <Text style={{ fontSize: 18, fontWeight: '900', color: colors.text }}>Select Trip</Text>
-              <TouchableOpacity onPress={() => setTripModalVisible(false)} style={{ padding: 4 }}>
-                <X size={20} color={colors.text} />
+            <ScrollView contentContainerStyle={{ padding: 24 }} showsVerticalScrollIndicator={false}>
+              
+              {/* Date Filter */}
+              <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10, color: colors.icon }}>Select Date</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
+                {[{ label: 'Today', val: todayStr }, { label: 'Yesterday', val: new Date(Date.now() - 86400000).toISOString().split('T')[0] }].map(opt => (
+                  <TouchableOpacity key={opt.label} onPress={() => setTempFilters(f => ({ ...f, date: opt.val }))}
+                    style={{ flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 14, borderWidth: 1, borderColor: tempFilters.date === opt.val ? colors.tint : colors.border, backgroundColor: tempFilters.date === opt.val ? `${colors.tint}1A` : colors.background }}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase', color: tempFilters.date === opt.val ? colors.tint : colors.text }}>{opt.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput
+                style={{ borderWidth: 1, borderRadius: 14, padding: 14, fontSize: 13, backgroundColor: colors.background, borderColor: colors.border, color: colors.text, marginBottom: 24, textAlign: 'center', fontWeight: '700' }}
+                value={tempFilters.date}
+                onChangeText={t => setTempFilters(f => ({ ...f, date: t }))}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={colors.icon}
+              />
+
+              {/* Route Filter */}
+              <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10, color: colors.icon }}>Route</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+                <TouchableOpacity onPress={() => setTempFilters(f => ({ ...f, routeId: '' }))}
+                  style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: tempFilters.routeId === '' ? colors.text : colors.border, backgroundColor: tempFilters.routeId === '' ? colors.text : colors.background }}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: tempFilters.routeId === '' ? colors.background : colors.text }}>All</Text>
+                </TouchableOpacity>
+                {routes.map(r => (
+                  <TouchableOpacity key={r._id} onPress={() => setTempFilters(f => ({ ...f, routeId: r._id }))}
+                    style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: tempFilters.routeId === r._id ? colors.tint : colors.border, backgroundColor: tempFilters.routeId === r._id ? `${colors.tint}1A` : colors.background }}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: tempFilters.routeId === r._id ? colors.tint : colors.text }}>{r.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Bus Filter */}
+              <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10, color: colors.icon }}>Bus</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+                <TouchableOpacity onPress={() => setTempFilters(f => ({ ...f, busId: '' }))}
+                  style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: tempFilters.busId === '' ? colors.text : colors.border, backgroundColor: tempFilters.busId === '' ? colors.text : colors.background }}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: tempFilters.busId === '' ? colors.background : colors.text }}>All</Text>
+                </TouchableOpacity>
+                {buses.map(b => (
+                  <TouchableOpacity key={b._id} onPress={() => setTempFilters(f => ({ ...f, busId: b._id }))}
+                    style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: tempFilters.busId === b._id ? colors.tint : colors.border, backgroundColor: tempFilters.busId === b._id ? `${colors.tint}1A` : colors.background }}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: tempFilters.busId === b._id ? colors.tint : colors.text }}>{b.busCode}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Time Slot Filter */}
+              <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10, color: colors.icon }}>Time Slot</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: tempFilters.timeSlot === 'Return' ? 12 : 24 }}>
+                {[{ label: 'All', val: '' }, { label: 'Morning', val: 'Morning' }, { label: 'Return', val: 'Return' }].map(slot => (
+                  <TouchableOpacity key={slot.label} onPress={() => setTempFilters(f => ({ ...f, timeSlot: slot.val, specificReturnTime: '' }))}
+                    style={{ flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 14, borderWidth: 1, borderColor: tempFilters.timeSlot === slot.val ? colors.tint : colors.border, backgroundColor: tempFilters.timeSlot === slot.val ? `${colors.tint}1A` : colors.background }}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase', color: tempFilters.timeSlot === slot.val ? colors.tint : colors.text }}>{slot.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Specific Return Time */}
+              {tempFilters.timeSlot === 'Return' && (
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 24 }}>
+                  {['3:30 PM', '7:00 PM'].map(time => (
+                    <TouchableOpacity key={time} onPress={() => setTempFilters(f => ({ ...f, specificReturnTime: f.specificReturnTime === time ? '' : time }))}
+                      style={{ flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 14, borderWidth: 1, borderColor: tempFilters.specificReturnTime === time ? colors.tint : colors.border, backgroundColor: tempFilters.specificReturnTime === time ? `${colors.tint}1A` : colors.background }}>
+                      <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase', color: tempFilters.specificReturnTime === time ? colors.tint : colors.text }}>{time}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+            </ScrollView>
+
+            <View style={{ padding: 24, borderTopWidth: 1, borderTopColor: colors.border, flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity onPress={clearFilters} style={{ flex: 1, paddingVertical: 16, borderRadius: 16, alignItems: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}>
+                <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: colors.text }}>Clear</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={applyFilters} style={{ flex: 2, paddingVertical: 16, borderRadius: 16, alignItems: 'center', backgroundColor: colors.tint }}>
+                <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: '#000' }}>Show Results</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <TouchableOpacity
-                style={{ paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}
-                onPress={() => { setSelectedTripId("all"); setTripModalVisible(false); }}
-              >
-                <Text style={{ fontWeight: '700', color: selectedTripId === "all" ? colors.tint : colors.text }}>All Trips</Text>
-              </TouchableOpacity>
-              {tripsForDate.map((t) => (
-                <TouchableOpacity
-                  key={t._id}
-                  style={{ paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}
-                  onPress={() => { setSelectedTripId(t._id); setTripModalVisible(false); }}
-                >
-                  <Text style={{ fontWeight: '700', color: selectedTripId === t._id ? colors.tint : colors.text }}>
-                    {TIME_SLOT_LABEL[t.time_slot] || t.time_slot} · {t.date.slice(0, 10)}
-                  </Text>
-                  <Text style={{ fontSize: 11, marginTop: 2, color: colors.icon }}>
-                    {t.route?.name || "Unknown Route"} · {t.booked_seats}/{t.total_seats} seats
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+
           </View>
         </View>
       </Modal>
 
-      {/* ── Close Trip Confirm Modal ── */}
-      <Modal visible={closeModal} transparent animationType="fade">
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: "rgba(0,0,0,0.7)", padding: 24 }}>
-          <View style={{ borderRadius: 28, padding: 24, width: '100%', backgroundColor: colors.card }}>
-            <Text style={{ fontSize: 16, fontWeight: '900', marginBottom: 8, color: colors.text }}>End Trip?</Text>
-            <Text style={{ fontSize: 13, marginBottom: 24, lineHeight: 20, color: colors.icon }}>
-              This will mark {pendingCount} pending student(s) as absent. This action cannot be undone.
-            </Text>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <TouchableOpacity
-                style={{ flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background }}
-                onPress={() => setCloseModal(false)}
-              >
-                <Text style={{ fontSize: 12, fontWeight: '800', color: colors.icon }}>CANCEL</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{ flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: 'center', backgroundColor: colors.error || "#ef4444", opacity: closingTrip ? 0.7 : 1 }}
-                onPress={handleCloseTrip}
-                disabled={!!closingTrip}
-              >
-                {closingTrip
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={{ fontSize: 12, fontWeight: '800', color: '#fff' }}>CONFIRM</Text>
-                }
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      <BottomBar role="admin" />
     </View>
   );
 }
