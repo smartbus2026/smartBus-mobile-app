@@ -1,138 +1,137 @@
+import { useRouter } from "expo-router";
 import {
-  Bus, Calendar, Clock,
-  Edit2, Plus, Trash2, Users, X
+  Bus, Calendar, ChevronDown, ChevronUp, Clock, Filter, Users, X
 } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator, KeyboardAvoidingView, Modal,
-  Platform, ScrollView, Text, TextInput, TouchableOpacity, View
+  ActivityIndicator, Modal, Platform, ScrollView,
+  Text, TextInput, TouchableOpacity, View
 } from "react-native";
 import { useThemeColor } from "../../constants/theme";
 import api from "../../src/services/api";
 import TopBar from "../../src/components/TopBar";
-import { useRouter } from "expo-router";
-interface TripData {
+
+interface Student {
+  _id: string;
+  name: string;
+  email: string;
+  bookingId: string;
+}
+
+interface AssignedTripData {
   id: string;
+  routeId: string;
   routeName: string;
-  date: string;
-  timeSlot: string;
+  busId: string;
   busNumber: string;
-  bookedSeats: number;
-  totalSeats: number;
+  driverName: string;
+  timeSlot: string;
+  specificReturnTime: string | null;
+  passengerCount: number;
+  students: Student[];
+  date: string;
   status: string;
-  rawDate: string;
-  rawTimeSlot: string;
 }
 
 export default function ManageTripsScreen() {
   const colors = useThemeColor();
-  const [trips, setTrips]                   = useState<TripData[]>([]);
-  const [isLoading, setIsLoading]           = useState(true);
-  const [toast, setToast]                   = useState<{ msg: string; type: 'success' | 'error' | null }>({ msg: '', type: null });
-  const [editingTrip, setEditingTrip]       = useState<TripData | null>(null);
-  const [deletingTripId, setDeletingTripId] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting]         = useState(false);
-  const router = useRouter(); // ← أضفها هنا
+  const router = useRouter();
 
-  const fetchTrips = async () => {
+  // ── State ──
+  const [trips, setTrips] = useState<AssignedTripData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // ── Filters State ──
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [filterRoute, setFilterRoute] = useState('');
+  const [filterBus, setFilterBus] = useState('');
+  const [filterTimeSlot, setFilterTimeSlot] = useState('');
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [tempDate, setTempDate] = useState(todayStr);
+
+  // ── Fetch Logic ──
+  const fetchTrips = useCallback(async (date: string) => {
     try {
       setIsLoading(true);
-      const res = await api.get("/trips");
-      const rawTrips = res.data?.data || res.data || [];
-      const departureTimeMap: Record<string, string> = {
-        'morning': '08:00 AM',
-        'return_1530': '03:30 PM',
-        'return_1900': '07:00 PM',
-      };
-      const mappedTrips: TripData[] = rawTrips.map((t: any) => ({
-        id: t._id,
-        routeName:   t.route?.name || 'Unknown Route',
-        date:        t.date ? new Date(t.date).toLocaleDateString('en-GB') : 'N/A',
-        timeSlot:    departureTimeMap[t.time_slot] || t.time_slot,
-        busNumber:   t.bus_number || t.route?.code || 'Bus #01',
-        bookedSeats: t.booked_seats || 0,
-        totalSeats:  t.total_seats || 40,
-        status:      t.status || 'scheduled',
-        rawDate:     t.date,
-        rawTimeSlot: t.time_slot,
+      const res = await api.get(`/bookings/admin/assigned-trips?date=${date}`);
+      const rawTrips = res.data?.data?.trips || res.data?.trips || [];
+      
+      const mappedTrips = rawTrips.map((t: any) => ({
+        ...t,
+        driverName: t.driverName || t.bus?.driver || 'Unassigned',
+        busNumber: t.busNumber || t.bus?.busCode || 'Unknown Bus',
       }));
       setTrips(mappedTrips);
     } catch (err) {
-      console.error("Failed to fetch trips", err);
+      console.log("Failed to fetch assigned trips", err);
+      setTrips([]);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  useEffect(() => { fetchTrips(); }, []);
+  }, []);
 
   useEffect(() => {
-    if (toast.msg) {
-      const t = setTimeout(() => setToast({ msg: '', type: null }), 3000);
-      return () => clearTimeout(t);
-    }
-  }, [toast]);
+    fetchTrips(selectedDate);
+  }, [selectedDate, fetchTrips]);
 
-  const handleDeleteConfirm = async () => {
-    if (!deletingTripId) return;
-    setIsDeleting(true);
-    try {
-      await api.delete(`/trips/${deletingTripId}`);
-      setTrips(prev => prev.filter(t => t.id !== deletingTripId));
-      setToast({ msg: 'Trip deleted successfully', type: 'success' });
-    } catch {
-      setToast({ msg: 'Failed to delete trip', type: 'error' });
-    } finally {
-      setIsDeleting(false);
-      setDeletingTripId(null);
+  // ── Derived Data for Filters ──
+  const uniqueRoutes = Array.from(new Set(trips.map(t => t.routeName))).filter(Boolean);
+  const uniqueBuses  = Array.from(new Set(trips.map(t => t.busNumber))).filter(Boolean);
+
+  // ── Apply Filters ──
+  const filteredTrips = trips.filter(t => {
+    if (filterRoute && t.routeName !== filterRoute) return false;
+    if (filterBus && t.busNumber !== filterBus) return false;
+    if (filterTimeSlot && t.timeSlot !== filterTimeSlot) return false;
+    return true;
+  });
+
+  const getStatusStyle = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'assigned': return { color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.3)' };
+      case 'active':   return { color: colors.success || '#22c55e', bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.3)' };
+      case 'completed':return { color: colors.tint, bg: `${colors.tint}1A`, border: `${colors.tint}4D` };
+      default:         return { color: colors.icon, bg: colors.background, border: colors.border };
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':    return colors.success || "#22c55e";
-      case 'completed': return colors.tint    || "#f7a01b";
-      case 'cancelled': return colors.error   || "#ef4444";
-      default:          return "#3b82f6";
-    }
+  const handleApplyFilters = () => {
+    setSelectedDate(tempDate);
+    setIsFilterModalOpen(false);
   };
+
+  const clearFilters = () => {
+    setFilterRoute('');
+    setFilterBus('');
+    setFilterTimeSlot('');
+    setTempDate(todayStr);
+    setSelectedDate(todayStr);
+    setIsFilterModalOpen(false);
+  };
+
+  const isFiltered = filterRoute !== '' || filterBus !== '' || filterTimeSlot !== '' || selectedDate !== todayStr;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <TopBar title="Assigned Trips" showMenu showSettings onSettingsPress={() => router.push('/(admin)/settings' as any)} />
 
-      {/* ── Top Bar ── */}
-<TopBar
-  title="Trips"
-  showMenu
-  showSettings
-  onSettingsPress={() => router.push('/(admin)/settings' as any)}
-/>
-      {/* ── Toast ── */}
-      {toast.msg ? (
-        <View style={{
-          position: 'absolute', top: 70, alignSelf: 'center', zIndex: 50,
-          paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1,
-          backgroundColor: toast.type === 'success' ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
-          borderColor:     toast.type === 'success' ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)",
-        }}>
-          <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, color: toast.type === 'success' ? (colors.success || "#22c55e") : (colors.error || "#ef4444") }}>
-            {toast.msg}
-          </Text>
-        </View>
-      ) : null}
-
-      {/* ── Title ── */}
-      <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <View>
-          <Text style={{ fontSize: 22, fontWeight: '800', letterSpacing: -0.5, color: colors.text }}>Timeline</Text>
+      {/* ── Header & Filter Trigger ── */}
+      <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 22, fontWeight: '900', letterSpacing: -0.5, textTransform: 'uppercase', color: colors.text }}>Overview</Text>
           <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginTop: 4, color: colors.icon }}>
-            Daily Fleet Operations
+            Dispatched Fleet Schedules
           </Text>
         </View>
+
         <TouchableOpacity
-          style={{ width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tint }}
+          onPress={() => setIsFilterModalOpen(true)}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, borderWidth: 1, backgroundColor: isFiltered ? colors.tint : colors.card, borderColor: isFiltered ? colors.tint : colors.border }}
         >
-          <Plus size={18} color={colors.background} />
+          <Filter size={14} color={isFiltered ? '#000' : colors.text} />
+          <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase', color: isFiltered ? '#000' : colors.text }}>Filters</Text>
         </TouchableOpacity>
       </View>
 
@@ -140,125 +139,197 @@ export default function ManageTripsScreen() {
       {isLoading ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color={colors.tint} />
+          <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginTop: 12, color: colors.icon }}>Loading Trips...</Text>
         </View>
-      ) : trips.length === 0 ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Clock size={40} color={colors.icon} style={{ opacity: 0.3, marginBottom: 16 }} />
-          <Text style={{ fontSize: 13, fontWeight: '600', color: colors.icon }}>No schedules available.</Text>
+      ) : filteredTrips.length === 0 ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', opacity: 0.5 }}>
+          <Bus size={48} color={colors.icon} style={{ marginBottom: 16 }} />
+          <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>No assigned trips found</Text>
+          <Text style={{ fontSize: 10, marginTop: 4, color: colors.icon }}>Try adjusting your filters or date.</Text>
         </View>
       ) : (
-        <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100, paddingTop: 10 }}
-          showsVerticalScrollIndicator={false}
-        >
-          {trips.map((trip, index) => {
-            const statusColor    = getStatusColor(trip.status);
-            const fillPercentage = Math.min((trip.bookedSeats / trip.totalSeats) * 100, 100);
-            const isFull         = fillPercentage >= 100;
-            const isLast         = index === trips.length - 1;
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100, paddingTop: 10 }} showsVerticalScrollIndicator={false}>
+          <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: colors.icon, marginBottom: 16 }}>
+            Showing {filteredTrips.length} trip{filteredTrips.length !== 1 ? 's' : ''} for <Text style={{ color: colors.tint }}>{selectedDate === todayStr ? 'Today' : selectedDate}</Text>
+          </Text>
+
+          {filteredTrips.map((trip) => {
+            const statusStyle = getStatusStyle(trip.status);
+            const isExpanded = expandedId === trip.id;
 
             return (
-              <View key={trip.id} style={{ flexDirection: 'row', minHeight: 100 }}>
-
-                {/* Timeline Graphic */}
-                <View style={{ width: 40, alignItems: 'center' }}>
-                  <View style={{ width: 16, height: 16, borderRadius: 8, borderWidth: 2, alignItems: 'center', justifyContent: 'center', marginTop: 4, borderColor: `${statusColor}40`, backgroundColor: colors.background }}>
-                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: statusColor }} />
-                  </View>
-                  {!isLast && <View style={{ flex: 1, width: 2, marginVertical: 4, backgroundColor: colors.border }} />}
-                </View>
-
-                {/* Content Card */}
-                <View style={{ flex: 1, borderRadius: 20, padding: 16, marginBottom: 20, borderWidth: 1, backgroundColor: colors.card, borderColor: colors.border }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <Text style={{ fontSize: 18, fontWeight: '900', color: colors.text }}>{trip.timeSlot}</Text>
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                      <TouchableOpacity
-                        style={{ padding: 6, borderRadius: 10, borderWidth: 1, backgroundColor: colors.background, borderColor: colors.border }}
-                        onPress={() => setEditingTrip(trip)}
-                      >
-                        <Edit2 size={14} color={colors.icon} />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={{ padding: 6, borderRadius: 10, borderWidth: 1, backgroundColor: colors.background, borderColor: colors.border }}
-                        onPress={() => setDeletingTripId(trip.id)}
-                      >
-                        <Trash2 size={14} color={colors.error || "#ef4444"} />
-                      </TouchableOpacity>
+              <View key={trip.id} style={{ borderRadius: 24, marginBottom: 20, borderWidth: 1, backgroundColor: colors.card, borderColor: isExpanded ? colors.tint : colors.border, overflow: 'hidden' }}>
+                
+                {/* ── Card Header ── */}
+                <View style={{ padding: 20 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                    <View style={{ flex: 1, paddingRight: 10 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text, marginBottom: 6 }}>{trip.routeName}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Calendar size={12} color={colors.icon} />
+                        <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: colors.icon }}>
+                          {new Date(trip.date).toLocaleDateString()}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, borderWidth: 1, backgroundColor: statusStyle.bg, borderColor: statusStyle.border }}>
+                      <Text style={{ fontSize: 9, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: statusStyle.color }}>{trip.status}</Text>
                     </View>
                   </View>
 
-                  <Text style={{ fontSize: 13, fontWeight: '700', marginBottom: 16, color: colors.icon }} numberOfLines={1}>
-                    {trip.routeName}
-                  </Text>
-
-                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: colors.background }}>
-                      <Calendar size={10} color={colors.icon} />
-                      <Text style={{ fontSize: 10, fontWeight: '800', color: colors.text }}>{trip.date}</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: colors.background }}>
-                      <Bus size={10} color={colors.tint} />
-                      <Text style={{ fontSize: 10, fontWeight: '800', color: colors.text }}>{trip.busNumber}</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: colors.background }}>
-                      <Users size={10} color={isFull ? (colors.error || "#ef4444") : "#3b82f6"} />
-                      <Text style={{ fontSize: 10, fontWeight: '800', color: isFull ? (colors.error || "#ef4444") : colors.text }}>
-                        {trip.bookedSeats}/{trip.totalSeats}
+                  {/* ── Details Grid ── */}
+                  <View style={{ gap: 12 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: `${colors.border}80` }}>
+                      <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: colors.icon }}>Time Slot</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '800', textTransform: 'uppercase', color: colors.text }}>
+                        {trip.timeSlot} {trip.specificReturnTime && trip.specificReturnTime !== 'none' ? `(${trip.specificReturnTime})` : ''}
                       </Text>
                     </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: `${colors.border}80` }}>
+                      <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: colors.icon }}>Bus</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Bus size={12} color={colors.tint} />
+                        <Text style={{ fontSize: 12, fontWeight: '800', textTransform: 'uppercase', color: colors.text }}>{trip.busNumber}</Text>
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: `${colors.border}80` }}>
+                      <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: colors.icon }}>Driver</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>{trip.driverName}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: colors.icon }}>Passengers</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Users size={12} color={colors.tint} />
+                        <Text style={{ fontSize: 12, fontWeight: '900', color: colors.text }}>{trip.passengerCount}</Text>
+                      </View>
+                    </View>
                   </View>
 
-                  <View style={{ alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1, backgroundColor: `${statusColor}15`, borderColor: `${statusColor}30` }}>
-                    <Text style={{ fontSize: 9, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: statusColor }}>
-                      {trip.status}
-                    </Text>
-                  </View>
+                  {/* ── Expand Button ── */}
+                  {trip.students && trip.students.length > 0 && (
+                    <TouchableOpacity
+                      onPress={() => setExpandedId(isExpanded ? null : trip.id)}
+                      style={{ marginTop: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, backgroundColor: colors.background }}
+                    >
+                      {isExpanded ? <ChevronUp size={14} color={colors.text} /> : <ChevronDown size={14} color={colors.text} />}
+                      <Text style={{ fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>
+                        {isExpanded ? 'Hide Students' : `View ${trip.students.length} Student${trip.students.length !== 1 ? 's' : ''}`}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
 
+                {/* ── Students List (Expanded State) ── */}
+                {isExpanded && trip.students && (
+                  <View style={{ borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: 'rgba(0,0,0,0.2)', padding: 20 }}>
+                    <Text style={{ fontSize: 9, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: colors.tint, marginBottom: 12 }}>Assigned Students</Text>
+                    {trip.students.map((s, i) => (
+                      <View key={s._id || i} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: i === trip.students.length - 1 ? 0 : 1, borderBottomColor: `${colors.border}80` }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                          <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: `${colors.tint}1A`, alignItems: 'center', justifyContent: 'center' }}>
+                            <Text style={{ fontSize: 12, fontWeight: '900', color: colors.tint }}>{s.name?.charAt(0)?.toUpperCase() || '?'}</Text>
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text, marginBottom: 2 }}>{s.name}</Text>
+                            <Text style={{ fontSize: 10, color: colors.icon }} numberOfLines={1}>{s.email}</Text>
+                          </View>
+                        </View>
+                        <Text style={{ fontSize: 10, fontWeight: '600', color: colors.icon, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
+                          #{s.bookingId?.toString().slice(-5).toUpperCase()}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
               </View>
             );
           })}
         </ScrollView>
       )}
 
-      {/* ── Edit Modal ── */}
-      {editingTrip && (
-        <EditTripModal
-          trip={editingTrip}
-          onClose={() => setEditingTrip(null)}
-          onSuccess={() => { setEditingTrip(null); fetchTrips(); setToast({ msg: 'Updated successfully', type: 'success' }); }}
-        />
-      )}
+      {/* ── Filters & Date Bottom Sheet Modal ── */}
+      <Modal visible={isFilterModalOpen} transparent animationType="slide">
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: "rgba(0,0,0,0.6)" }}>
+          <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 32, borderTopRightRadius: 32, maxHeight: '85%', paddingBottom: Platform.OS === 'ios' ? 40 : 20 }}>
+            
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 24, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+              <Text style={{ fontSize: 16, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>Filters & Date</Text>
+              <TouchableOpacity onPress={() => setIsFilterModalOpen(false)} style={{ padding: 8, borderRadius: 12, backgroundColor: colors.background }}>
+                <X size={20} color={colors.text} />
+              </TouchableOpacity>
+            </View>
 
-      {/* ── Delete Modal ── */}
-      <Modal visible={!!deletingTripId} transparent animationType="fade">
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: "rgba(0,0,0,0.7)" }}>
-          <View style={{ borderRadius: 28, padding: 24, width: '100%', alignItems: 'center', borderWidth: 1, backgroundColor: colors.card, borderColor: colors.border }}>
-            <View style={{ width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 16, backgroundColor: "rgba(239,68,68,0.1)" }}>
-              <Trash2 size={24} color={colors.error || "#ef4444"} />
-            </View>
-            <Text style={{ fontSize: 18, fontWeight: '800', marginBottom: 8, color: colors.text }}>Delete Trip</Text>
-            <Text style={{ fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 24, color: colors.icon }}>
-              Are you sure you want to delete this trip permanently?
-            </Text>
-            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
-              <TouchableOpacity
-                style={{ flex: 1, paddingVertical: 14, borderRadius: 16, alignItems: 'center', backgroundColor: colors.background }}
-                onPress={() => setDeletingTripId(null)}
-              >
-                <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon }}>CANCEL</Text>
+            <ScrollView contentContainerStyle={{ padding: 24 }} showsVerticalScrollIndicator={false}>
+              
+              {/* Date Filter */}
+              <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10, color: colors.icon }}>Select Date</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
+                {[{ label: 'Today', val: todayStr }, { label: 'Tomorrow', val: new Date(Date.now() + 86400000).toISOString().split('T')[0] }].map(opt => (
+                  <TouchableOpacity key={opt.label} onPress={() => setTempDate(opt.val)}
+                    style={{ flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 14, borderWidth: 1, borderColor: tempDate === opt.val ? colors.tint : colors.border, backgroundColor: tempDate === opt.val ? `${colors.tint}1A` : colors.background }}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase', color: tempDate === opt.val ? colors.tint : colors.text }}>{opt.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput
+                style={{ borderWidth: 1, borderRadius: 14, padding: 14, fontSize: 13, backgroundColor: colors.background, borderColor: colors.border, color: colors.text, marginBottom: 24, textAlign: 'center', fontWeight: '700' }}
+                value={tempDate}
+                onChangeText={setTempDate}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={colors.icon}
+              />
+
+              {/* Route Filter */}
+              <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10, color: colors.icon }}>Route</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+                <TouchableOpacity onPress={() => setFilterRoute('')}
+                  style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: filterRoute === '' ? colors.text : colors.border, backgroundColor: filterRoute === '' ? colors.text : colors.background }}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: filterRoute === '' ? colors.background : colors.text }}>All</Text>
+                </TouchableOpacity>
+                {uniqueRoutes.map(r => (
+                  <TouchableOpacity key={r} onPress={() => setFilterRoute(r)}
+                    style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: filterRoute === r ? colors.tint : colors.border, backgroundColor: filterRoute === r ? `${colors.tint}1A` : colors.background }}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: filterRoute === r ? colors.tint : colors.text }}>{r}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Bus Filter */}
+              <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10, color: colors.icon }}>Bus Number</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+                <TouchableOpacity onPress={() => setFilterBus('')}
+                  style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: filterBus === '' ? colors.text : colors.border, backgroundColor: filterBus === '' ? colors.text : colors.background }}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: filterBus === '' ? colors.background : colors.text }}>All</Text>
+                </TouchableOpacity>
+                {uniqueBuses.map(b => (
+                  <TouchableOpacity key={b} onPress={() => setFilterBus(b)}
+                    style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: filterBus === b ? colors.tint : colors.border, backgroundColor: filterBus === b ? `${colors.tint}1A` : colors.background }}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: filterBus === b ? colors.tint : colors.text }}>{b}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Time Slot Filter */}
+              <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10, color: colors.icon }}>Time Slot</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {[{ label: 'All', val: '' }, { label: 'Morning', val: 'Morning' }, { label: 'Return', val: 'Return' }].map(slot => (
+                  <TouchableOpacity key={slot.label} onPress={() => setFilterTimeSlot(slot.val)}
+                    style={{ flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 14, borderWidth: 1, borderColor: filterTimeSlot === slot.val ? colors.tint : colors.border, backgroundColor: filterTimeSlot === slot.val ? `${colors.tint}1A` : colors.background }}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase', color: filterTimeSlot === slot.val ? colors.tint : colors.text }}>{slot.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+
+            <View style={{ padding: 24, borderTopWidth: 1, borderTopColor: colors.border, flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity onPress={clearFilters} style={{ flex: 1, paddingVertical: 16, borderRadius: 16, alignItems: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}>
+                <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: colors.text }}>Clear</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={{ flex: 1, paddingVertical: 14, borderRadius: 16, alignItems: 'center', backgroundColor: colors.error || "#ef4444" }}
-                onPress={handleDeleteConfirm}
-                disabled={isDeleting}
-              >
-                <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, color: '#fff' }}>
-                  {isDeleting ? "..." : "DELETE"}
-                </Text>
+              <TouchableOpacity onPress={handleApplyFilters} style={{ flex: 2, paddingVertical: 16, borderRadius: 16, alignItems: 'center', backgroundColor: colors.tint }}>
+                <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: '#000' }}>Apply Filters</Text>
               </TouchableOpacity>
             </View>
+
           </View>
         </View>
       </Modal>
@@ -266,107 +337,3 @@ export default function ManageTripsScreen() {
     </View>
   );
 }
-
-// ── Edit Trip Modal ──
-const EditTripModal = ({ trip, onClose, onSuccess }: any) => {
-  const colors        = useThemeColor();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const formattedDate = trip.rawDate ? new Date(trip.rawDate).toISOString().split('T')[0] : '';
-  const [formData, setFormData] = useState({
-    date:        formattedDate,
-    time_slot:   trip.rawTimeSlot,
-    bus_number:  trip.busNumber,
-    total_seats: trip.totalSeats.toString(),
-  });
-
-  const handleSubmit = async () => {
-    setIsSubmitting(true);
-    try {
-      await api.put(`/trips/${trip.id}`, { ...formData, total_seats: Number(formData.total_seats) });
-      onSuccess();
-    } catch {
-      alert("Failed to update trip");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <Modal transparent animationType="slide" visible>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: "rgba(0,0,0,0.7)" }}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={{ borderTopLeftRadius: 32, borderTopRightRadius: 32, maxHeight: '85%', backgroundColor: colors.card }}
-        >
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 24, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>Edit Trip Details</Text>
-            <TouchableOpacity onPress={onClose} style={{ padding: 8, borderRadius: 12, backgroundColor: colors.background }}>
-              <X size={20} color={colors.text} />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={{ padding: 24 }} showsVerticalScrollIndicator={false}>
-            <Text style={{ fontSize: 15, fontWeight: '900', marginBottom: 20, color: colors.tint }}>{trip.routeName}</Text>
-
-            <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 8, marginTop: 16, color: colors.icon }}>TRIP DATE (YYYY-MM-DD)</Text>
-            <TextInput
-              style={{ borderWidth: 1, borderRadius: 16, padding: 16, fontSize: 13, backgroundColor: colors.background, borderColor: colors.border, color: colors.text }}
-              value={formData.date}
-              onChangeText={t => setFormData({ ...formData, date: t })}
-              placeholderTextColor={colors.icon}
-            />
-
-            <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 8, marginTop: 16, color: colors.icon }}>TIME SLOT</Text>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              {[
-                { id: "morning",     label: "Morning"   },
-                { id: "return_1530", label: "03:30 PM"  },
-                { id: "return_1900", label: "07:00 PM"  },
-              ].map((slot) => (
-                <TouchableOpacity
-                  key={slot.id}
-                  style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 16, borderWidth: 1, backgroundColor: formData.time_slot === slot.id ? `${colors.tint}0D` : colors.background, borderColor: formData.time_slot === slot.id ? colors.tint : colors.border }}
-                  onPress={() => setFormData({ ...formData, time_slot: slot.id })}
-                >
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: formData.time_slot === slot.id ? colors.tint : colors.icon }}>{slot.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 8, marginTop: 16, color: colors.icon }}>BUS NUMBER</Text>
-                <TextInput
-                  style={{ borderWidth: 1, borderRadius: 16, padding: 16, fontSize: 13, backgroundColor: colors.background, borderColor: colors.border, color: colors.text }}
-                  value={formData.bus_number}
-                  onChangeText={t => setFormData({ ...formData, bus_number: t })}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 8, marginTop: 16, color: colors.icon }}>TOTAL SEATS</Text>
-                <TextInput
-                  style={{ borderWidth: 1, borderRadius: 16, padding: 16, fontSize: 13, backgroundColor: colors.background, borderColor: colors.border, color: colors.text }}
-                  keyboardType="numeric"
-                  value={formData.total_seats}
-                  onChangeText={t => setFormData({ ...formData, total_seats: t })}
-                />
-              </View>
-            </View>
-          </ScrollView>
-
-          <View style={{ padding: 24, borderTopWidth: 1, borderTopColor: colors.border, paddingBottom: Platform.OS === 'ios' ? 40 : 24 }}>
-            <TouchableOpacity
-              style={{ paddingVertical: 16, borderRadius: 16, alignItems: 'center', backgroundColor: colors.tint }}
-              onPress={handleSubmit}
-              disabled={isSubmitting}
-            >
-              <Text style={{ fontSize: 13, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, color: colors.background }}>
-                {isSubmitting ? "SAVING..." : "SAVE CHANGES"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
-      </View>
-    </Modal>
-  );
-};
