@@ -1,55 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   View, Text, ScrollView, ActivityIndicator, StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useThemeColor } from '../../constants/theme';
-import Api from '../../src/services/api';
-import TopBar from '../../src/components/TopBar';
+import { useRoutes } from '../../src/hooks/useRoutes';
 
-interface BusRoute {
-  id: string;
-  code: string;
-  name: string;
-  distance: string;
-  duration: string;
-  stops: string[];
-  driver?: string;
-  time?: string;
-  bus?: string;
-}
+import TopBar from '../../src/components/TopBar';
+import { BOTTOM_BAR_HEIGHT } from '../../src/hooks/useBottomBarHeight';
 
 export default function RouteDetailsPage() {
-  const colors  = useThemeColor();
-  const router  = useRouter();
-  const [routes, setRoutes]       = useState<BusRoute[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const colors              = useThemeColor();
+  const router              = useRouter();
+  const { routes, isLoading } = useRoutes();
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await Api.get('/routes');
-        const data = res.data?.data || res.data || [];
-        const mapped = data.map((r: any, i: number) => ({
-          id:       r._id,
-          code:     `R-${String(i + 1).padStart(3, '0')}`,
-          name:     r.name,
-          distance: r.distance || '—',
-          duration: r.duration || '—',
-          stops:    r.stops ? r.stops.map((s: any) => s.name || s) : [],
-          driver:   r.driver || 'Pending',
-          time:     r.time || 'TBA',
-          bus:      r.bus || r.code || 'BUS-01',
-        }));
-        setRoutes(mapped);
-      } catch (err) {
-        console.error('Failed to fetch routes', err);
-      } finally {
-        setIsLoading(false);
-      }
-    })();
-  }, []);
-
+  // ── Loading ────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <View style={[s.loadWrap, { backgroundColor: colors.background }]}>
@@ -59,6 +24,7 @@ export default function RouteDetailsPage() {
     );
   }
 
+  // ── Main ───────────────────────────────────────────────────────────────
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
 
@@ -71,68 +37,85 @@ export default function RouteDetailsPage() {
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={s.scroll}
+        contentContainerStyle={[s.scroll, { paddingBottom: BOTTOM_BAR_HEIGHT + 16 }]}
         showsVerticalScrollIndicator={false}
       >
-        {routes.map((r) => (
-          <View key={r.id} style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {routes?.map((r: any) => {
+          const busLabel = r.bus || r.code || 'BUS-01';
+          return (
+            <View
+              key={r._id || r.name}
+              style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+            >
 
-            {/* Header */}
-            <View style={s.cardHeader}>
-              <Text style={[s.routeName, { color: colors.text }]}>{r.name}</Text>
-              <View style={[s.busTag, { backgroundColor: `${colors.tint}1A`, borderColor: `${colors.tint}33` }]}>
-                <Text style={[s.busTagText, { color: colors.tint }]}>{r.bus}</Text>
-              </View>
-            </View>
-
-            {/* Route Timeline */}
-            <View style={s.timeline}>
-              {r.stops.map((stop, i) => {
-                const isFirst = i === 0;
-                const isLast  = i === r.stops.length - 1;
-                const isEnd   = isFirst || isLast;
-                return (
-                  <View key={stop + i} style={s.stopRow}>
-                    <View style={s.dotCol}>
-                      <View style={[
-                        s.dot,
-                        isEnd
-                          ? { backgroundColor: colors.tint }
-                          : { backgroundColor: colors.card, borderWidth: 2, borderColor: colors.border },
-                      ]} />
-                      {!isLast && <View style={[s.line, { backgroundColor: colors.border }]} />}
-                    </View>
-                    <Text style={[
-                      s.stopName,
-                      { color: isEnd ? colors.text : colors.icon },
-                      isEnd ? s.stopNameEnd : s.stopNameMid,
-                      !isLast && { marginBottom: 16 },
-                    ]}>
-                      {stop}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
-
-            {/* Footer */}
-            <View style={s.footer}>
-              <View style={[s.footerBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                <Text style={[s.footerLabel, { color: colors.icon }]}>DRIVER</Text>
-                <View style={s.driverRow}>
-                  <View style={s.driverDot} />
-                  <Text style={[s.footerValue, { color: colors.text }]}>{r.driver}</Text>
+              {/* ── Header ── */}
+              <View style={s.cardHeader}>
+                <Text style={[s.routeName, { color: colors.text }]}>{r.name}</Text>
+                <View style={[s.busTag, { backgroundColor: `${colors.tint}1A`, borderColor: `${colors.tint}33` }]}>
+                  <Text style={[s.busTagText, { color: colors.tint }]}>{busLabel}</Text>
                 </View>
               </View>
-              <View style={[s.footerBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                <Text style={[s.footerLabel, s.footerLabelRight, { color: colors.icon }]}>DEPARTURE</Text>
-                <Text style={[s.departure, { color: colors.tint }]}>{r.time}</Text>
-              </View>
-            </View>
-          </View>
-        ))}
 
-        <View style={{ height: 100 }} />
+              {/* ── Route Timeline ── */}
+              <View style={s.timeline}>
+                {r.stops?.map((stop: any, i: number) => {
+                  const isFirst  = i === 0;
+                  const isLast   = i === r.stops.length - 1;
+                  const isEnd    = isFirst || isLast;
+                  const stopName = typeof stop === 'string' ? stop : stop.name;
+
+                  return (
+                    <View key={(stopName || '') + i} style={s.stopRow}>
+                      {/* Dot + Line */}
+                      <View style={s.dotCol}>
+                        <View style={[
+                          s.dot,
+                          isEnd
+                            ? { backgroundColor: colors.tint }
+                            : { backgroundColor: colors.card, borderWidth: 2, borderColor: colors.border },
+                        ]} />
+                        {!isLast && <View style={[s.line, { backgroundColor: colors.border }]} />}
+                      </View>
+
+                      {/* Stop Name */}
+                      <Text style={[
+                        s.stopName,
+                        { color: isEnd ? colors.text : colors.icon },
+                        isEnd ? s.stopNameEnd : s.stopNameMid,
+                        !isLast && { marginBottom: 16 },
+                      ]}>
+                        {stopName}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+
+              {/* ── Footer ── */}
+              <View style={s.footer}>
+                {/* Driver */}
+                <View style={[s.footerBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <Text style={[s.footerLabel, { color: colors.icon }]}>DRIVER</Text>
+                  <View style={s.driverRow}>
+                    <View style={s.driverDot} />
+                    <Text style={[s.footerValue, { color: colors.text }]}>
+                      {r.driver || 'Pending'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Departure */}
+                <View style={[s.footerBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <Text style={[s.footerLabel, s.footerLabelRight, { color: colors.icon }]}>DEPARTURE</Text>
+                  <Text style={[s.departure, { color: colors.tint }]}>
+                    {r.time || 'TBA'}
+                  </Text>
+                </View>
+              </View>
+
+            </View>
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -169,7 +152,3 @@ const s = StyleSheet.create({
   footerValue:      { fontSize: 11, fontWeight: '700' },
   departure:        { fontSize: 13, fontWeight: '800', textAlign: 'right' },
 });
-import { BOTTOM_BAR_HEIGHT } from '../../src/hooks/useBottomBarHeight';
-
-// في الـ styles
-<View style={{ flex: 1, paddingBottom: BOTTOM_BAR_HEIGHT }}></View>

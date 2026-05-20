@@ -1,6 +1,4 @@
 import { DrawerContentScrollView } from "@react-navigation/drawer";
-import { DrawerActions } from "@react-navigation/native";
-import { useNavigation } from "@react-navigation/native";
 import { router, usePathname } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import {
@@ -27,6 +25,8 @@ const ADMIN_NAV = [
   { name: "settings",      label: "Settings",       icon: Settings },
 ];
 
+const BOTTOM_BAR_HEIGHT = Platform.OS === 'ios' ? 85 : 70;
+
 function AdminDrawerContent(props: any) {
   const colors     = useThemeColor();
   const { logout } = useAuth();
@@ -39,7 +39,7 @@ function AdminDrawerContent(props: any) {
   };
 
   return (
-    <View style={{ flex: 1, paddingBottom: 20, backgroundColor: colors.card }}>
+    <View style={{ flex: 1, backgroundColor: colors.card }}>
 
       {/* Header */}
       <View style={{
@@ -65,30 +65,41 @@ function AdminDrawerContent(props: any) {
         Operational Command
       </Text>
 
-      {/* Nav Links */}
-      <DrawerContentScrollView {...props} showsVerticalScrollIndicator={false}>
-        {ADMIN_NAV.map((item) => {
-          const Icon     = item.icon;
-          const isActive = current === item.name;
-          return (
-            <TouchableOpacity
-              key={item.name}
-              style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 16, marginHorizontal: 8, marginBottom: 2, backgroundColor: isActive ? `${colors.tint}1A` : "transparent" }}
-              onPress={() => router.push(`/(admin)/${item.name}` as any)}
-              activeOpacity={0.7}
-            >
-              <Icon size={18} color={isActive ? colors.tint : colors.icon} />
-              <Text style={{ fontSize: 13, fontWeight: "700", color: isActive ? colors.tint : colors.icon }}>{item.label}</Text>
-              {isActive && <View style={{ position: "absolute", left: 0, width: 3, height: 20, borderRadius: 2, backgroundColor: colors.tint }} />}
-            </TouchableOpacity>
-          );
-        })}
-      </DrawerContentScrollView>
+      {/* ── Nav Links — flex:1 عشان ياخد باقي المساحة ── */}
+      <View style={{ flex: 1 }}>
+        <DrawerContentScrollView
+          {...props}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 8 }}
+        >
+          {ADMIN_NAV.map((item) => {
+            const Icon     = item.icon;
+            const isActive = current === item.name;
+            return (
+              <TouchableOpacity
+                key={item.name}
+                style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 16, marginHorizontal: 8, marginBottom: 2, backgroundColor: isActive ? `${colors.tint}1A` : "transparent" }}
+                onPress={() => router.push(`/(admin)/${item.name}` as any)}
+                activeOpacity={0.7}
+              >
+                <Icon size={18} color={isActive ? colors.tint : colors.icon} />
+                <Text style={{ fontSize: 13, fontWeight: "700", color: isActive ? colors.tint : colors.icon }}>{item.label}</Text>
+                {isActive && <View style={{ position: "absolute", left: 0, width: 3, height: 20, borderRadius: 2, backgroundColor: colors.tint }} />}
+              </TouchableOpacity>
+            );
+          })}
+        </DrawerContentScrollView>
+      </View>
 
-      {/* ✅ Logout */}
-      <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12, paddingHorizontal: 8 }}>
+      {/* ── Logout — دايماً فوق الـ bottom bar ── */}
+      <View style={{
+        borderTopWidth: 1, borderTopColor: colors.border,
+        paddingTop: 12,
+        paddingBottom: BOTTOM_BAR_HEIGHT + 8,
+        paddingHorizontal: 8,
+      }}>
         <TouchableOpacity
-          style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16 }}
+          style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16, backgroundColor: 'rgba(239,68,68,0.08)' }}
           onPress={handleLogout}
           activeOpacity={0.7}
         >
@@ -107,7 +118,6 @@ function AdminBottomBar() {
 
   const isActive = (route: string) => pathname.includes(route.toLowerCase());
 
-  // ✅ بدون زر Menu
   const tabs = [
     { id: "dashboard",     label: "Home",    icon: LayoutGrid, path: "/(admin)/dashboard" },
     { id: "trips",         label: "Trips",   icon: Route,      path: "/(admin)/trips" },
@@ -121,7 +131,7 @@ function AdminBottomBar() {
       position: 'absolute', bottom: 0, left: 0, right: 0,
       backgroundColor: colors.card,
       borderTopWidth: 1, borderTopColor: colors.border,
-      height: Platform.OS === 'ios' ? 85 : 70,
+      height: BOTTOM_BAR_HEIGHT,
       paddingBottom: Platform.OS === 'ios' ? 25 : 10,
       paddingTop: 10,
       zIndex: 999,

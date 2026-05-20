@@ -4,95 +4,98 @@ import {
   FlatList, StyleSheet, ActivityIndicator,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { HelpCircle, Check, Send } from 'lucide-react-native';
-import { io, Socket } from 'socket.io-client';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { MapPin, Send, Clock, Loader } from 'lucide-react-native';
+import socket from '../../src/services/socket';
 import Api from '../../src/services/api';
 import { useThemeColor } from '../../constants/theme';
-import { useAuth } from '../../src/context/AuthContext';
-import TopBar from '../../src/components/TopBar';
 
-interface ChatMessage {
+interface Message {
   _id: string;
-  sender: { _id: string; name: string };
+  roomId: string;
   message: string;
+  sender: {
+    _id: string;
+    name: string;
+  };
   createdAt: string;
 }
 
-export default function TripChat() {
-  const colors   = useThemeColor();
-  const router   = useRouter();
-  const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const { token }  = useAuth();
+export default function GroupChat() {
+  const colors = useThemeColor();
 
-  const [messages, setMessages]           = useState<ChatMessage[]>([]);
-  const [newMessage, setNewMessage]       = useState('');
-  const [error, setError]                 = useState<string | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string>('');
-  const socketRef   = useRef<Socket | null>(null);
-  const flatListRef = useRef<FlatList>(null);
+  const [isOpen, setIsOpen]           = useState(false);
+  const [messageLabel, setMessageLabel] = useState('Loading chat status...');
+  const [roomId, setRoomId]           = useState('');
+  const [routeName, setRouteName]     = useState('');
+  const [timeSlot, setTimeSlot]       = useState('');
 
-  useEffect(() => {
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        setCurrentUserId(payload.id || '');
-      } catch {}
-    }
-  }, [token]);
+  const [messages, setMessages]       = useState<Message[]>([]);
+  const [newMessage, setNewMessage]   = useState('');
+  const [isLoading, setIsLoading]     = useState(true);
+
+  const flatListRef   = useRef<FlatList>(null);
+  const currentUserId = ''; // replace with AsyncStorage / AuthContext
 
   useEffect(() => {
-    if (!tripId || tripId === 'default' || tripId.length < 24) {
-      setError('Please select a valid trip to start chatting.');
-      return;
-    }
-    setError(null);
-
-    const fetchHistory = async () => {
+    const fetchChatStatus = async () => {
       try {
-        const res = await Api.get(`/chat/${tripId}`);
-        setMessages(res.data || []);
-        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
-      } catch (err: any) {
-        if (err.response?.status === 403)
-          setError('Access denied. You are not registered for this trip.');
+        const res  = await Api.get('/chat/active-group');
+        const data = res.data;
+        if (data.isOpen) {
+          setIsOpen(true);
+          setRoomId(data.roomId);
+          setRouteName(data.routeName);
+          setTimeSlot(data.timeSlot);
+          setMessages(data.messages || []);
+          socket.emit('joinRoom', data.roomId);
+        } else {
+          setIsOpen(false);
+          setMessageLabel(data.message || 'Chat is closed.');
+        }
+      } catch (err) {
+        console.error('Failed to fetch chat status', err);
+        setMessageLabel('Failed to verify chat status.');
+      } finally {
+        setIsLoading(false);
       }
     };
-    fetchHistory();
-
-    socketRef.current = io('http://192.168.1.105:5001', {
-      transports: ['websocket', 'polling'],
-    });
-    socketRef.current.emit('join-trip-room', tripId);
-    socketRef.current.on('new-message', (message: ChatMessage) => {
-      setMessages(prev => [...prev, message]);
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-    });
+    fetchChatStatus();
 
     return () => {
-      socketRef.current?.emit('leave-trip-room', tripId);
-      socketRef.current?.disconnect();
+      if (roomId) socket.emit('leaveRoom', roomId);
     };
-  }, [tripId]);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleNewMessage = (msg: Message) => {
+      setMessages(prev => [...prev, msg]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    };
+    socket.on('newMessage', handleNewMessage);
+    return () => {
+      socket.off('newMessage', handleNewMessage);
+    };
+  }, [isOpen]);
 
   const handleSend = async () => {
-    if (!newMessage.trim() || !tripId || tripId === 'default') return;
+    if (!newMessage.trim() || !roomId) return;
     const text = newMessage;
     setNewMessage('');
     try {
-      await Api.post(`/chat/${tripId}`, { message: text });
+      await Api.post(`/chat/${roomId}`, { message: text });
     } catch (err) {
       console.error('Failed to send message', err);
     }
   };
 
-  const renderMessage = ({ item: msg }: { item: ChatMessage }) => {
-    const isMe = msg.sender._id === currentUserId;
+  const renderMessage = ({ item: m }: { item: Message }) => {
+    const isMe = m.sender._id === currentUserId;
     return (
       <View style={[s.msgRow, isMe ? s.msgRowMe : s.msgRowThem]}>
         <View style={s.msgContent}>
           {!isMe && (
-            <Text style={[s.senderName, { color: colors.icon }]}>{msg.sender.name}</Text>
+            <Text style={[s.senderName, { color: colors.icon }]}>{m.sender.name}</Text>
           )}
           <View style={[
             s.bubble,
@@ -101,125 +104,146 @@ export default function TripChat() {
               : [s.bubbleThem, { backgroundColor: colors.card, borderColor: colors.border }],
           ]}>
             <Text style={[s.msgText, { color: isMe ? '#000' : colors.text }]}>
-              {msg.message}
+              {m.message}
             </Text>
-            <View style={s.msgMeta}>
-              <Text style={[s.msgTime, { color: isMe ? 'rgba(0,0,0,0.5)' : colors.icon }]}>
-                {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </Text>
-              {isMe && <Check size={10} color="rgba(0,0,0,0.5)" />}
-            </View>
+            <Text style={[s.msgTime, { color: isMe ? 'rgba(0,0,0,0.5)' : colors.icon }]}>
+              {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
           </View>
         </View>
       </View>
     );
   };
 
+  // ── Loading ──────────────────────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <View style={[s.centerWrap, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.tint} />
+      </View>
+    );
+  }
+
+  // ── Chat Closed ──────────────────────────────────────────────────────────
+  if (!isOpen) {
+    return (
+      <View style={[s.centerWrap, { backgroundColor: colors.background }]}>
+        <View style={[s.closedCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Clock size={40} color={colors.icon} style={{ opacity: 0.5, marginBottom: 16 }} />
+          <Text style={[s.closedTitle, { color: colors.text }]}>Chat Window Closed</Text>
+          <Text style={[s.closedSub,   { color: colors.icon }]}>{messageLabel}</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // ── Chat Open ────────────────────────────────────────────────────────────
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
 
-      <TopBar
-        title="Live Chat"
-        showMenu
-        showBack={false}
-        showSettings
-        onSettingsPress={() => router.push('/(student)/settings' as any)}
-      />
-
-      {error ? (
-        <View style={[s.errorWrap, { backgroundColor: colors.background }]}>
-          <View style={[s.errorCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <HelpCircle size={48} color={colors.tint} style={{ opacity: 0.5, marginBottom: 12 }} />
-            <Text style={[s.errorText, { color: colors.icon }]}>{error}</Text>
+      {/* Header */}
+      <View style={[s.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <View>
+          <Text style={[s.headerTitle, { color: colors.text }]}>Route Group Chat</Text>
+          <View style={s.headerMeta}>
+            <MapPin size={10} color={colors.tint} />
+            <Text style={[s.headerMetaText, { color: colors.icon }]}>{routeName}</Text>
+            <Text style={[s.headerMetaText, { color: colors.icon }]}>•</Text>
+            <Text style={[s.headerMetaText, { color: colors.icon }]}>{timeSlot} Wave</Text>
           </View>
         </View>
-      ) : (
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-        >
-          {/* Online indicator */}
-          <View style={[s.onlineBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-            <View style={s.onlineDot} />
-            <Text style={s.onlineText}>Connected Live</Text>
-          </View>
+        <View style={s.liveBadge}>
+          <View style={s.liveDot} />
+          <Text style={s.liveText}>Live</Text>
+        </View>
+      </View>
 
-          {/* Messages */}
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            keyExtractor={(item, i) => item._id || String(i)}
-            renderItem={renderMessage}
-            contentContainerStyle={s.messagesList}
-            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
-            ListEmptyComponent={
-              <View style={s.emptyWrap}>
-                <Text style={[s.emptyText, { color: colors.icon }]}>Start the conversation</Text>
-              </View>
-            }
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
+        {/* Messages */}
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item, i) => item._id || String(i)}
+          renderItem={renderMessage}
+          contentContainerStyle={s.messagesList}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          ListEmptyComponent={
+            <View style={s.emptyWrap}>
+              <Send size={24} color={colors.icon} style={{ opacity: 0.4, marginBottom: 8 }} />
+              <Text style={[s.emptyTitle, { color: colors.text }]}>No messages yet</Text>
+              <Text style={[s.emptySub,   { color: colors.icon }]}>Be the first to say hello!</Text>
+            </View>
+          }
+        />
+
+        {/* Input */}
+        <View style={[s.inputBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+          <TextInput
+            style={[s.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+            placeholder="Type your message..."
+            placeholderTextColor={colors.icon}
+            value={newMessage}
+            onChangeText={setNewMessage}
+            onSubmitEditing={handleSend}
+            returnKeyType="send"
+            multiline
           />
+          <TouchableOpacity
+            style={[s.sendBtn, { backgroundColor: colors.tint }, !newMessage.trim() && s.sendDisabled]}
+            onPress={handleSend}
+            disabled={!newMessage.trim()}
+            activeOpacity={0.85}
+          >
+            <Send size={14} color="#000" />
+            <Text style={s.sendLabel}>Send</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
 
-          {/* Input */}
-          <View style={[s.inputBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
-            <TextInput
-              style={[s.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
-              placeholder="Type your message..."
-              placeholderTextColor={colors.icon}
-              value={newMessage}
-              onChangeText={setNewMessage}
-              onSubmitEditing={handleSend}
-              returnKeyType="send"
-              multiline
-            />
-            <TouchableOpacity
-              style={[s.sendBtn, { backgroundColor: colors.tint }, !newMessage.trim() && s.sendDisabled]}
-              onPress={handleSend}
-              disabled={!newMessage.trim()}
-              activeOpacity={0.85}
-            >
-              <Send size={18} color="#000" />
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
-      )}
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  root:         { flex: 1 },
+  root:          { flex: 1 },
 
-  errorWrap:    { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  errorCard:    { borderWidth: 1, borderRadius: 24, padding: 32, alignItems: 'center' },
-  errorText:    { fontSize: 13, fontWeight: '700', textAlign: 'center', textTransform: 'uppercase', letterSpacing: 1 },
+  centerWrap:    { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  closedCard:    { borderWidth: 1, borderRadius: 24, padding: 32, alignItems: 'center', maxWidth: 300 },
+  closedTitle:   { fontSize: 18, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, textAlign: 'center' },
+  closedSub:     { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, textAlign: 'center', lineHeight: 18 },
 
-  onlineBar:    { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 10, borderBottomWidth: 1 },
-  onlineDot:    { width: 8, height: 8, borderRadius: 4, backgroundColor: '#22c55e' },
-  onlineText:   { fontSize: 9, fontWeight: '800', color: '#22c55e', textTransform: 'uppercase', letterSpacing: 1.5 },
+  header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1 },
+  headerTitle:   { fontSize: 16, fontWeight: '900', letterSpacing: 0.5 },
+  headerMeta:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  headerMetaText:{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
 
-  messagesList: { padding: 16, gap: 12, flexGrow: 1 },
-  msgRow:       { marginBottom: 12 },
-  msgRowMe:     { alignItems: 'flex-end' },
-  msgRowThem:   { alignItems: 'flex-start' },
-  msgContent:   { maxWidth: '75%' },
-  senderName:   { fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4, marginLeft: 4 },
+  liveBadge:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(34,197,94,0.1)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.2)' },
+  liveDot:       { width: 6, height: 6, borderRadius: 3, backgroundColor: '#22c55e' },
+  liveText:      { fontSize: 10, fontWeight: '900', color: '#22c55e', textTransform: 'uppercase', letterSpacing: 1.5 },
 
-  bubble:       { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20 },
-  bubbleThem:   { borderWidth: 1, borderBottomLeftRadius: 4 },
-  msgText:      { fontSize: 14, fontWeight: '500', lineHeight: 20 },
-  msgMeta:      { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4, justifyContent: 'flex-end' },
-  msgTime:      { fontSize: 8, fontWeight: '700' },
+  messagesList:  { padding: 16, gap: 12, flexGrow: 1 },
+  msgRow:        { marginBottom: 12 },
+  msgRowMe:      { alignItems: 'flex-end' },
+  msgRowThem:    { alignItems: 'flex-start' },
+  msgContent:    { maxWidth: '75%' },
+  senderName:    { fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4, marginLeft: 4 },
 
-  emptyWrap:    { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, opacity: 0.3 },
-  emptyText:    { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2 },
+  bubble:        { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20 },
+  bubbleThem:    { borderWidth: 1, borderBottomLeftRadius: 4 },
+  msgText:       { fontSize: 14, fontWeight: '500', lineHeight: 20 },
+  msgTime:       { fontSize: 9, fontWeight: '700', marginTop: 4, textAlign: 'right' },
 
-  inputBar:     { flexDirection: 'row', alignItems: 'flex-end', gap: 10, padding: 12, borderTopWidth: 1 },
-  input:        { flex: 1, borderWidth: 1, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, maxHeight: 100 },
-  sendBtn:      { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  sendDisabled: { opacity: 0.4 },
+  emptyWrap:     { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
+  emptyTitle:    { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2 },
+  emptySub:      { fontSize: 10, marginTop: 4 },
+
+  inputBar:      { flexDirection: 'row', alignItems: 'flex-end', gap: 10, padding: 12, borderTopWidth: 1 },
+  input:         { flex: 1, borderWidth: 1, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, maxHeight: 100 },
+  sendBtn:       { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 20, height: 48, borderRadius: 16, justifyContent: 'center' },
+  sendDisabled:  { opacity: 0.4 },
+  sendLabel:     { fontSize: 11, fontWeight: '900', color: '#000', textTransform: 'uppercase', letterSpacing: 1.5 },
 });
-import { BOTTOM_BAR_HEIGHT } from '../../src/hooks/useBottomBarHeight';
-
-// في الـ styles
-<View style={{ flex: 1, paddingBottom: BOTTOM_BAR_HEIGHT }}></View>

@@ -25,6 +25,8 @@ const STUDENT_NAV = [
   { name: "settings",      label: "Profile",       icon: User },
 ];
 
+const BOTTOM_BAR_HEIGHT = Platform.OS === 'ios' ? 85 : 70;
+
 function StudentDrawerContent(props: any) {
   const colors     = useThemeColor();
   const { logout } = useAuth();
@@ -77,46 +79,49 @@ function StudentDrawerContent(props: any) {
         Navigation
       </Text>
 
-      {/* ── Nav Links — flex: 1 عشان ياخد باقي المساحة ── */}
-      <DrawerContentScrollView
-        {...props}
-        showsVerticalScrollIndicator={false}
-        style={{ flex: 1 }}
-      >
-        {STUDENT_NAV.map((item) => {
-          const Icon     = item.icon;
-          const isActive = current === item.name;
-          return (
-            <TouchableOpacity
-              key={item.name}
-              style={{
-                flexDirection: 'row', alignItems: 'center', gap: 12,
-                paddingHorizontal: 16, paddingVertical: 10,
-                borderRadius: 16, marginHorizontal: 8, marginBottom: 2,
-                backgroundColor: isActive ? `${colors.tint}1A` : 'transparent',
-              }}
-              onPress={() => router.push(`/(student)/${item.name}` as any)}
-              activeOpacity={0.7}
-            >
-              <Icon size={18} color={isActive ? colors.tint : colors.icon} />
-              <Text style={{ fontSize: 13, fontWeight: '700', color: isActive ? colors.tint : colors.icon }}>
-                {item.label}
-              </Text>
-              {isActive && (
-                <View style={{
-                  position: 'absolute', left: 0, width: 3, height: 20,
-                  borderRadius: 2, backgroundColor: colors.tint,
-                }} />
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </DrawerContentScrollView>
+      {/* ── Nav Links — flex:1 عشان ياخد باقي المساحة ── */}
+      <View style={{ flex: 1 }}>
+        <DrawerContentScrollView
+          {...props}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 8 }}
+        >
+          {STUDENT_NAV.map((item) => {
+            const Icon     = item.icon;
+            const isActive = current === item.name;
+            return (
+              <TouchableOpacity
+                key={item.name}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 12,
+                  paddingHorizontal: 16, paddingVertical: 10,
+                  borderRadius: 16, marginHorizontal: 8, marginBottom: 2,
+                  backgroundColor: isActive ? `${colors.tint}1A` : 'transparent',
+                }}
+                onPress={() => router.push(`/(student)/${item.name}` as any)}
+                activeOpacity={0.7}
+              >
+                <Icon size={18} color={isActive ? colors.tint : colors.icon} />
+                <Text style={{ fontSize: 13, fontWeight: '700', color: isActive ? colors.tint : colors.icon }}>
+                  {item.label}
+                </Text>
+                {isActive && (
+                  <View style={{
+                    position: 'absolute', left: 0, width: 3, height: 20,
+                    borderRadius: 2, backgroundColor: colors.tint,
+                  }} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </DrawerContentScrollView>
+      </View>
 
-      {/* ── Logout — دايماً في الأسفل ── */}
+      {/* ── Logout — دايماً فوق الـ bottom bar ── */}
       <View style={{
         borderTopWidth: 1, borderTopColor: colors.border,
-        paddingTop: 8, paddingBottom: insets.bottom + 8,
+        paddingTop: 8,
+        paddingBottom: BOTTOM_BAR_HEIGHT + 8,
         paddingHorizontal: 8,
       }}>
         <TouchableOpacity
@@ -158,7 +163,7 @@ function StudentBottomBar() {
       position: 'absolute', bottom: 0, left: 0, right: 0,
       backgroundColor: colors.card,
       borderTopWidth: 1, borderTopColor: colors.border,
-      height: Platform.OS === 'ios' ? 85 : 70,
+      height: BOTTOM_BAR_HEIGHT,
       paddingBottom: Platform.OS === 'ios' ? 25 : 10,
       paddingTop: 10,
     }}>

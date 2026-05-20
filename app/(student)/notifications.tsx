@@ -4,10 +4,11 @@ import {
   StyleSheet, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bell } from 'lucide-react-native';
+import { Bell, Check } from 'lucide-react-native';
 import Api from '../../src/services/api';
 import { useThemeColor } from '../../constants/theme';
 import TopBar from '../../src/components/TopBar';
+import socket from '../../src/services/socket';
 
 interface Notification {
   _id: string;
@@ -38,15 +39,51 @@ export default function NotificationsScreen() {
     }
   }, []);
 
-  useEffect(() => { fetchNotifs(); }, []);
+  useEffect(() => { fetchNotifs(); }, [fetchNotifs]);
+
+  // Real-time socket
+  useEffect(() => {
+    const handleNewNotif = (notif: any) => {
+      setNotifs(prev => [{
+        _id:       notif._id || Date.now().toString(),
+        title:     notif.title   || 'New Alert',
+        message:   notif.message || '',
+        type:      notif.type    || 'general',
+        read:      false,
+        createdAt: notif.createdAt || new Date().toISOString(),
+      }, ...prev]);
+    };
+
+    socket.on('newNotification',  handleNewNotif);
+    socket.on('new_notification', handleNewNotif);
+    return () => {
+      socket.off('newNotification',  handleNewNotif);
+      socket.off('new_notification', handleNewNotif);
+    };
+  }, []);
 
   const onRefresh = () => { setRefreshing(true); fetchNotifs(); };
 
   const handleMarkRead = async (id: string) => {
+    // Optimistic update
+    setNotifs(prev => prev.map(n => n._id === id ? { ...n, read: true } : n));
     try {
       await Api.put(`/notifications/${id}/read`);
-      setNotifs(prev => prev.map(n => n._id === id ? { ...n, read: true } : n));
-    } catch {}
+    } catch {
+      // Revert on failure
+      setNotifs(prev => prev.map(n => n._id === id ? { ...n, read: false } : n));
+    }
+  };
+
+  const handleReadAll = async () => {
+    const hasUnread = notifs.some(n => !n.read);
+    if (!hasUnread) return;
+    setNotifs(prev => prev.map(n => ({ ...n, read: true })));
+    try {
+      await Api.put('/notifications/read-all');
+    } catch (err) {
+      console.error('Failed to mark all as read', err);
+    }
   };
 
   const unreadCount = notifs.filter(n => !n.read).length;
@@ -67,7 +104,7 @@ export default function NotificationsScreen() {
         title="Notifications"
         showMenu
         showSettings
-        onSettingsPress={() => router.push('/(admin)/settings' as any)}
+        onSettingsPress={() => router.push('/(student)/settings' as any)}
       />
 
       <ScrollView
@@ -78,6 +115,20 @@ export default function NotificationsScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.tint} />
         }
       >
+
+        {/* Header Row */}
+        <View style={s.headerRow}>
+          <Text style={[s.headerTitle, { color: colors.text }]}>Your Notifications</Text>
+          {unreadCount > 0 && (
+            <TouchableOpacity
+              style={[s.readAllBtn, { backgroundColor: `${colors.tint}1A`, borderColor: `${colors.tint}33` }]}
+              onPress={handleReadAll}
+              activeOpacity={0.8}
+            >
+              <Text style={[s.readAllTxt, { color: colors.tint }]}>Mark All Read</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
         {/* Unread Badge */}
         {unreadCount > 0 && (
@@ -94,7 +145,7 @@ export default function NotificationsScreen() {
             <Text style={[s.emptyDesc, { color: colors.icon }]}>You're all caught up! Check back later.</Text>
           </View>
         ) : (
-          notifs.map((n) => (
+          notifs.map(n => (
             <TouchableOpacity
               key={n._id}
               style={[
@@ -126,7 +177,9 @@ export default function NotificationsScreen() {
                   </View>
                 </View>
 
-                <Text style={[s.message, { color: colors.icon }]} numberOfLines={2}>{n.message}</Text>
+                <Text style={[s.message, { color: colors.icon }]} numberOfLines={2}>
+                  {n.message}
+                </Text>
 
                 <View style={s.footer}>
                   <Text style={[s.time, { color: colors.icon }]}>
@@ -140,9 +193,12 @@ export default function NotificationsScreen() {
                       ? { backgroundColor: colors.background }
                       : { backgroundColor: 'rgba(34,197,94,0.08)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.2)' },
                   ]}>
-                    <Text style={[s.statusTxt, { color: n.read ? colors.icon : '#22c55e' }]}>
-                      {n.read ? '✓ Read' : 'Tap to mark read'}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      {n.read && <Check size={9} color={colors.icon} />}
+                      <Text style={[s.statusTxt, { color: n.read ? colors.icon : '#22c55e' }]}>
+                        {n.read ? 'Read' : 'Tap to mark read'}
+                      </Text>
+                    </View>
                   </View>
                 </View>
               </View>
@@ -164,6 +220,11 @@ const s = StyleSheet.create({
   scroll:      { padding: 20, paddingTop: 16 },
   center:      { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   loadingTxt:  { fontSize: 11, fontWeight: '700', letterSpacing: 2 },
+
+  headerRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  headerTitle: { fontSize: 15, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  readAllBtn:  { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 7 },
+  readAllTxt:  { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
 
   unreadBadge: { alignSelf: 'flex-start', marginBottom: 16, borderWidth: 1, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
   unreadTxt:   { fontSize: 9, fontWeight: '700', letterSpacing: 1 },

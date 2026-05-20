@@ -10,13 +10,14 @@ import { useRouter } from 'expo-router';
 import Api from '../../src/services/api';
 import { useThemeColor } from '../../constants/theme';
 import TopBar from '../../src/components/TopBar';
+import { BOTTOM_BAR_HEIGHT } from '../../src/hooks/useBottomBarHeight';
 
 const FAQS = [
-  { q: 'How do I book a trip?',          a: 'Go to Book Trip from the menu, select your route and time slot, then confirm your booking.' },
-  { q: 'How do I cancel a booking?',     a: 'Go to My Trips, find the booking you want to cancel, and tap the Cancel button.' },
-  { q: 'How do I track my bus?',         a: 'Go to Track Bus from the menu to see the live location of your bus.' },
-  { q: 'What if I miss my bus?',         a: 'If you miss your bus, your booking will be marked as missed. Contact support for assistance.' },
-  { q: 'How is attendance calculated?',  a: 'Attendance is calculated based on your confirmed boardings vs total bookings.' },
+  { q: 'How do I book a trip?',         a: 'Go to Book Trip from the menu, select your route and time slot, then confirm your booking.' },
+  { q: 'How do I cancel a booking?',    a: 'Go to My Trips, find the booking you want to cancel, and tap the Cancel button.' },
+  { q: 'How do I track my bus?',        a: 'Go to Track Bus from the menu to see the live location of your bus.' },
+  { q: 'What if I miss my bus?',        a: 'If you miss your bus, your booking will be marked as missed. Contact support for assistance.' },
+  { q: 'How is attendance calculated?', a: 'Attendance is calculated based on your confirmed boardings vs total bookings.' },
 ];
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
@@ -83,11 +84,11 @@ export default function SupportPage() {
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={s.scroll}
+        contentContainerStyle={[s.scroll, { paddingBottom: BOTTOM_BAR_HEIGHT + 16 }]}
         showsVerticalScrollIndicator={false}
       >
 
-        {/* FAQ Section */}
+        {/* ── FAQ ── */}
         <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={s.cardHeader}>
             <View style={[s.iconBox, { backgroundColor: `${colors.tint}1A` }]}>
@@ -117,7 +118,7 @@ export default function SupportPage() {
           ))}
         </View>
 
-        {/* Submit Ticket */}
+        {/* ── Submit Ticket ── */}
         <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={s.cardHeader}>
             <View style={[s.iconBox, { backgroundColor: `${colors.tint}1A` }]}>
@@ -133,7 +134,10 @@ export default function SupportPage() {
               </View>
               <Text style={[s.successTitle, { color: colors.text }]}>Ticket Submitted!</Text>
               <Text style={[s.successSub, { color: colors.icon }]}>We'll respond within 24 hours.</Text>
-              <TouchableOpacity onPress={() => { setSubmitted(false); setSubject(''); setDesc(''); }}>
+              <TouchableOpacity
+                onPress={() => { setSubmitted(false); setSubject(''); setDesc(''); }}
+                activeOpacity={0.7}
+              >
                 <Text style={[s.successLink, { color: colors.tint }]}>Send another report</Text>
               </TouchableOpacity>
             </View>
@@ -180,7 +184,7 @@ export default function SupportPage() {
           )}
         </View>
 
-        {/* Previous Tickets */}
+        {/* ── Previous Tickets ── */}
         <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[s.sectionTitle, { color: colors.text }]}>PREVIOUS TICKETS</Text>
           {tickets.length === 0 ? (
@@ -191,7 +195,9 @@ export default function SupportPage() {
               return (
                 <View key={t._id} style={[s.ticketRow, inputBg, { borderColor: colors.border }]}>
                   <View style={s.ticketLeft}>
-                    <Text style={[s.ticketSubject, { color: colors.text }]} numberOfLines={1}>{t.subject}</Text>
+                    <Text style={[s.ticketSubject, { color: colors.text }]} numberOfLines={1}>
+                      {t.subject}
+                    </Text>
                     <Text style={[s.ticketMeta, { color: colors.icon }]}>
                       {t._id.slice(-6).toUpperCase()} • {new Date(t.createdAt).toLocaleDateString()}
                     </Text>
@@ -205,53 +211,48 @@ export default function SupportPage() {
           )}
         </View>
 
-        <View style={{ height: 100 }} />
       </ScrollView>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  root:          { flex: 1 },
-  scroll:        { padding: 20, paddingTop: 16, gap: 14 },
+  root:           { flex: 1 },
+  scroll:         { padding: 20, paddingTop: 16, gap: 14 },
 
-  card:          { borderWidth: 1, borderRadius: 20, padding: 20 },
-  cardHeader:    { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
-  iconBox:       { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  cardTitle:     { fontSize: 13, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  card:           { borderWidth: 1, borderRadius: 20, padding: 20 },
+  cardHeader:     { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+  iconBox:        { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  cardTitle:      { fontSize: 13, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
 
-  faqItem:       { borderTopWidth: 1, paddingVertical: 4 },
-  faqQuestion:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 },
-  faqQ:          { fontSize: 13, fontWeight: '700', flex: 1, paddingRight: 10, lineHeight: 18 },
-  faqA:          { fontSize: 12, lineHeight: 18, paddingBottom: 10 },
+  faqItem:        { borderTopWidth: 1, paddingVertical: 4 },
+  faqQuestion:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 },
+  faqQ:           { fontSize: 13, fontWeight: '700', flex: 1, paddingRight: 10, lineHeight: 18 },
+  faqA:           { fontSize: 12, lineHeight: 18, paddingBottom: 10 },
 
-  successWrap:   { alignItems: 'center', paddingVertical: 24 },
-  successIcon:   { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(34,197,94,0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  successTitle:  { fontSize: 15, fontWeight: '700', marginBottom: 4 },
-  successSub:    { fontSize: 11, marginBottom: 16 },
-  successLink:   { fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },
+  successWrap:    { alignItems: 'center', paddingVertical: 24 },
+  successIcon:    { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(34,197,94,0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  successTitle:   { fontSize: 15, fontWeight: '700', marginBottom: 4 },
+  successSub:     { fontSize: 11, marginBottom: 16 },
+  successLink:    { fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },
 
-  formWrap:      { gap: 14 },
-  fieldWrap:     { gap: 6 },
-  label:         { fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' },
-  input:         { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 13 },
-  textArea:      { height: 100, paddingTop: 12 },
+  formWrap:       { gap: 14 },
+  fieldWrap:      { gap: 6 },
+  label:          { fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' },
+  input:          { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 13 },
+  textArea:       { height: 100, paddingTop: 12 },
 
-  submitBtn:     { borderRadius: 14, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  submitDisabled:{ opacity: 0.5 },
-  submitText:    { color: '#000', fontWeight: '700', fontSize: 13 },
+  submitBtn:      { borderRadius: 14, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  submitDisabled: { opacity: 0.5 },
+  submitText:     { color: '#000', fontWeight: '700', fontSize: 13 },
 
-  sectionTitle:  { fontSize: 11, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 14 },
-  emptyText:     { textAlign: 'center', fontSize: 12, paddingVertical: 24, opacity: 0.5 },
+  sectionTitle:   { fontSize: 11, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 14 },
+  emptyText:      { textAlign: 'center', fontSize: 12, paddingVertical: 24, opacity: 0.5 },
 
-  ticketRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 8 },
-  ticketLeft:    { flex: 1, marginRight: 10 },
-  ticketSubject: { fontSize: 13, fontWeight: '700', marginBottom: 3 },
-  ticketMeta:    { fontSize: 10, fontWeight: '500' },
-  statusBadge:   { borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  statusText:    { fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  ticketRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 8 },
+  ticketLeft:     { flex: 1, marginRight: 10 },
+  ticketSubject:  { fontSize: 13, fontWeight: '700', marginBottom: 3 },
+  ticketMeta:     { fontSize: 10, fontWeight: '500' },
+  statusBadge:    { borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  statusText:     { fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
 });
-import { BOTTOM_BAR_HEIGHT } from '../../src/hooks/useBottomBarHeight';
-
-// في الـ styles
-<View style={{ flex: 1, paddingBottom: BOTTOM_BAR_HEIGHT }}></View>

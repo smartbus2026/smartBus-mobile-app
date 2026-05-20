@@ -1,102 +1,209 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  ActivityIndicator, StyleSheet, Alert,
+  ActivityIndicator, StyleSheet, Alert, Modal,
 } from 'react-native';
 import {
   Calendar, MapPin, ArrowRight, Bus,
-  Clock, Route, Check, X,
+  Clock, Check, X, Route,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Api from '../../src/services/api';
 import { useThemeColor } from '../../constants/theme';
 import TopBar from '../../src/components/TopBar';
+import socket from '../../src/services/socket';
 
-type TripStatus = 'upcoming' | 'completed' | 'missed';
+type TripStatus = 'upcoming' | 'completed' | 'missed' | 'cancelled';
 
-const timeSlotMap: Record<string, string> = {
-  morning:     'Morning',
-  return_1530: '3:30 PM',
-  return_1900: '7:00 PM',
-};
+const OptionBtn = ({
+  label, selected, onPress, colors,
+}: {
+  label: string; selected: boolean; onPress: () => void; colors: any;
+}) => (
+  <TouchableOpacity
+    style={[
+      s.optBtn,
+      { backgroundColor: colors.background, borderColor: colors.border },
+      selected && { backgroundColor: `${colors.tint}14`, borderColor: `${colors.tint}80` },
+    ]}
+    onPress={onPress}
+    activeOpacity={0.8}
+  >
+    <Text style={[s.optLabel, { color: colors.icon }, selected && { color: colors.tint, fontWeight: '700' }]}>
+      {label}
+    </Text>
+    {selected && (
+      <View style={[s.checkCircle, { backgroundColor: `${colors.tint}26`, borderColor: `${colors.tint}66` }]}>
+        <Text style={[s.checkText, { color: colors.tint }]}>✓</Text>
+      </View>
+    )}
+  </TouchableOpacity>
+);
 
-export default function MyTripsPage() {
-  const router  = useRouter();
-  const colors  = useThemeColor();
+export default function MyTripsScreen() {
+  const router = useRouter();
+  const colors = useThemeColor();
 
   const [tab, setTab]             = useState<TripStatus>('upcoming');
   const [bookings, setBookings]   = useState<any[]>([]);
+  const [routes, setRoutes]       = useState<any[]>([]);
+  const [settings, setSettings]   = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchMyBookings = async () => {
+  // Edit modal
+  const [editModal, setEditModal]         = useState<{ open: boolean; booking: any | null }>({ open: false, booking: null });
+  const [editRouteId, setEditRouteId]     = useState('');
+  const [editTimeSlot, setEditTimeSlot]   = useState('');
+  const [editReturnTime, setEditReturnTime] = useState('');
+  const [editSaving, setEditSaving]       = useState(false);
+  const [editError, setEditError]         = useState('');
+
+  const [attendanceLoading, setAttendanceLoading] = useState<string | null>(null);
+  const [toast, setToast]                         = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const fetchAll = useCallback(async () => {
     try {
-      const res = await Api.get('/bookings/my');
-      setBookings(res.data?.data?.bookings || []);
+      const [bRes, rRes, sRes] = await Promise.all([
+        Api.get('/bookings/my'),
+        Api.get('/routes'),
+        Api.get('/settings'),
+      ]);
+      setBookings(bRes.data?.data?.bookings || []);
+      setRoutes(rRes.data?.data || []);
+      const cfg = sRes.data?.data?.settings;
+      if (cfg) setSettings(cfg);
     } catch (err) {
-      console.error('Failed to fetch my bookings', err);
+      console.error('Failed to fetch', err);
     } finally {
       setIsLoading(false);
     }
+  }, []);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // Live socket
+  useEffect(() => {
+    const handleBusAssigned = (payload: any) => {
+      if (!payload?.bookingIds || !payload?.busDetails) return;
+      setBookings(prev =>
+        prev.map(b =>
+          payload.bookingIds.includes(b._id)
+            ? { ...b, status: 'assigned', busId: payload.busDetails }
+            : b
+        )
+      );
+    };
+    socket.on('bookingAssigned', handleBusAssigned);
+    return () => { socket.off('bookingAssigned', handleBusAssigned); };
+  }, []);
+
+  const isWindowOpen = () => {
+    if (!settings) return false;
+    const now  = new Date();
+    const cur  = now.getHours() * 60 + now.getMinutes();
+    const open  = settings.booking_open_hour  * 60 + settings.booking_open_minute;
+    const close = settings.booking_close_hour * 60 + settings.booking_close_minute;
+    return cur >= open && cur <= close;
   };
 
-  useEffect(() => { fetchMyBookings(); }, []);
+  const parseTimeToMinutes = (t: string): number => {
+    if (!t) return 0;
+    const m = t.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (!m) return 0;
+    let h = parseInt(m[1]);
+    const min = parseInt(m[2]);
+    if (m[3].toUpperCase() === 'PM' && h !== 12) h += 12;
+    if (m[3].toUpperCase() === 'AM' && h === 12) h = 0;
+    return h * 60 + min;
+  };
 
-  const handleCancelBooking = (bookingId: string) => {
-    Alert.alert('Cancel Booking', 'Are you sure you want to cancel this booking?', [
+  const isAttendanceUnlocked = (b: any): boolean => {
+    if (!settings) return false;
+    const bd    = new Date(b.date);
+    const today = new Date();
+    if (bd.toDateString() !== today.toDateString()) return false;
+    const nowM = today.getHours() * 60 + today.getMinutes();
+    if (b.timeSlot === 'Morning') return nowM >= parseTimeToMinutes(settings.morningStartTime || '08:30 AM');
+    return nowM >= parseTimeToMinutes(b.specificReturnTime || '');
+  };
+
+  const handleCancel = (id: string) => {
+    Alert.alert('Cancel Booking', 'Cancel this booking?', [
       { text: 'No', style: 'cancel' },
       {
         text: 'Yes, Cancel', style: 'destructive',
         onPress: async () => {
           try {
-            await Api.put(`/bookings/${bookingId}/cancel`);
-            fetchMyBookings();
+            await Api.put(`/bookings/${id}/cancel`);
+            fetchAll();
           } catch (err: any) {
-            Alert.alert('Error', err.response?.data?.message || 'Failed to cancel booking');
+            Alert.alert('Error', err.response?.data?.message || 'Failed to cancel');
           }
         },
       },
     ]);
   };
 
-  const handleMarkAttend = (bookingId: string) => {
-    Alert.alert('Confirm Boarding', 'Confirm that you have boarded the bus?', [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Yes, Boarded',
-        onPress: async () => {
-          try {
-            await Api.patch(`/bookings/${bookingId}/attend`);
-            fetchMyBookings();
-          } catch (err: any) {
-            Alert.alert('Error', err.response?.data?.message || 'Failed to mark attendance');
-          }
-        },
-      },
-    ]);
+  const handleAttendance = async (id: string, status: 'completed' | 'missed') => {
+    setAttendanceLoading(id);
+    try {
+      await Api.patch(`/bookings/${id}/attendance`, { attendanceStatus: status });
+      setBookings(prev =>
+        prev.map(b =>
+          b._id === id
+            ? { ...b, attendanceStatus: status, status, attended: status === 'completed' }
+            : b
+        )
+      );
+      setToast({ message: `Trip marked as ${status}!`, type: 'success' });
+      setTimeout(() => setToast(null), 3000);
+    } catch (err: any) {
+      setToast({ message: err.response?.data?.message || 'Failed to mark attendance', type: 'error' });
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setAttendanceLoading(null);
+    }
   };
 
-  const mappedTrips = bookings.map((b) => {
-    const tripDate = b.trip?.date ? new Date(b.trip.date) : null;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const isPast = tripDate ? tripDate < today : false;
+  const openEdit = (booking: any) => {
+    setEditModal({ open: true, booking });
+    setEditRouteId(booking.route?._id || '');
+    setEditTimeSlot(booking.timeSlot || '');
+    setEditReturnTime(booking.specificReturnTime || '');
+    setEditError('');
+  };
 
+  const handleEditSave = async () => {
+    if (!editModal.booking) return;
+    setEditSaving(true);
+    setEditError('');
+    try {
+      const payload: any = { routeId: editRouteId, timeSlot: editTimeSlot };
+      if (editTimeSlot === 'Return') payload.specificReturnTime = editReturnTime;
+      await Api.patch(`/bookings/${editModal.booking._id}`, payload);
+      setEditModal({ open: false, booking: null });
+      fetchAll();
+    } catch (err: any) {
+      setEditError(err.response?.data?.message || 'Failed to update');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const mappedTrips = bookings.map(b => {
+    const bd    = b.date ? new Date(b.date) : null;
     let currentStatus: TripStatus = 'upcoming';
-    if (b.status === 'cancelled')                    currentStatus = 'missed';
-    else if (b.status === 'completed' || b.attended) currentStatus = 'completed';
-    else if (b.status === 'missed')                  currentStatus = 'missed';
-    else if (isPast && b.status === 'active')        currentStatus = 'missed';
-
+    if (b.status === 'cancelled')              currentStatus = 'cancelled';
+    else if (b.attendanceStatus === 'completed') currentStatus = 'completed';
+    else if (b.attendanceStatus === 'missed')    currentStatus = 'missed';
     return {
-      id:         b._id,
-      status:     currentStatus,
-      attended:   b.attended,
-      date:       b.trip?.date ? new Date(b.trip.date).toDateString() : 'TBA',
-      from:       b.trip?.route?.name || 'Selected Route',
-      to:         'Campus',
-      pickup:     timeSlotMap[b.trip?.time_slot] || b.trip?.time_slot || '—',
-      bus:        b.trip?.bus_number || 'Bus System',
-      returnTime: b.trip?.time_slot === 'morning' ? 'N/A' : (timeSlotMap[b.trip?.time_slot] || b.trip?.time_slot || 'N/A'),
+      raw: b, id: b._id, status: currentStatus,
+      date: bd ? bd.toDateString() : 'TBA',
+      from: b.route?.name || 'Route',
+      timeSlot: b.timeSlot,
+      returnTime: b.timeSlot === 'Return' ? (b.specificReturnTime || 'TBA') : 'N/A',
+      bookingStatus: b.status,
+      attendanceStatus: b.attendanceStatus,
     };
   });
 
@@ -104,13 +211,23 @@ export default function MyTripsPage() {
     upcoming:  mappedTrips.filter(t => t.status === 'upcoming').length,
     completed: mappedTrips.filter(t => t.status === 'completed').length,
     missed:    mappedTrips.filter(t => t.status === 'missed').length,
+    cancelled: mappedTrips.filter(t => t.status === 'cancelled').length,
   };
-
   const list = mappedTrips.filter(t => t.status === tab);
 
-  const getBorderColor = (status: TripStatus) => {
+  const getBookingBadge = (status: string, colors: any) => {
+    if (status === 'pending')   return { bg: 'rgba(96,165,250,0.1)',  border: 'rgba(96,165,250,0.2)',  text: '#60a5fa',  label: '⏳ Pending' };
+    if (status === 'assigned')  return { bg: `${colors.tint}1A`,      border: `${colors.tint}33`,      text: colors.tint, label: '🚌 Bus Assigned' };
+    if (status === 'active')    return { bg: 'rgba(34,197,94,0.1)',   border: 'rgba(34,197,94,0.2)',   text: '#22c55e',  label: '✓ Active' };
+    if (status === 'completed') return { bg: 'rgba(96,165,250,0.1)',  border: 'rgba(96,165,250,0.2)',  text: '#60a5fa',  label: '✓ Done' };
+    if (status === 'missed')    return { bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.2)',   text: '#ef4444',  label: '✗ Missed' };
+    return                             { bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.2)',   text: '#ef4444',  label: 'Cancelled' };
+  };
+
+  const getCardBorderColor = (status: TripStatus) => {
     if (status === 'completed') return 'rgba(59,130,246,0.3)';
     if (status === 'missed')    return 'rgba(239,68,68,0.3)';
+    if (status === 'cancelled') return 'rgba(115,115,115,0.2)';
     return colors.border;
   };
 
@@ -133,15 +250,33 @@ export default function MyTripsPage() {
         onSettingsPress={() => router.push('/(student)/settings' as any)}
       />
 
+      {/* Toast */}
+      {toast && (
+        <View style={[
+          s.toast,
+          toast.type === 'success'
+            ? { backgroundColor: 'rgba(34,197,94,0.15)', borderColor: 'rgba(34,197,94,0.3)' }
+            : { backgroundColor: 'rgba(239,68,68,0.15)', borderColor: 'rgba(239,68,68,0.3)' },
+        ]}>
+          {toast.type === 'success'
+            ? <Check size={14} color="#22c55e" />
+            : <X size={14} color="#ef4444" />
+          }
+          <Text style={[s.toastText, { color: toast.type === 'success' ? '#22c55e' : '#ef4444' }]}>
+            {toast.message}
+          </Text>
+        </View>
+      )}
+
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={s.scroll}
         showsVerticalScrollIndicator={false}
       >
 
-        {/* Tabs */}
+        {/* Tab Bar */}
         <View style={[s.tabBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          {(['upcoming', 'completed', 'missed'] as TripStatus[]).map(t => (
+          {(['upcoming', 'completed', 'missed', 'cancelled'] as TripStatus[]).map(t => (
             <TouchableOpacity
               key={t}
               style={[
@@ -160,65 +295,114 @@ export default function MyTripsPage() {
         </View>
 
         {/* Trip Cards */}
-        {list.map(t => (
-          <View key={t.id} style={[s.card, { backgroundColor: colors.card, borderColor: getBorderColor(t.status as TripStatus) }]}>
+        {list.map(t => {
+          const unlocked      = isAttendanceUnlocked(t.raw);
+          const alreadyMarked = t.attendanceStatus === 'completed' || t.attendanceStatus === 'missed';
+          const windowOpen    = isWindowOpen();
+          const badge         = getBookingBadge(t.bookingStatus, colors);
 
-            {/* Card Header */}
-            <View style={s.cardHeader}>
-              <View style={s.dateWrap}>
-                <Calendar size={12} color={colors.icon} />
-                <Text style={[s.dateText, { color: colors.icon }]}>{t.date}</Text>
-              </View>
-              {t.status === 'upcoming'  && <View style={[s.badge, s.badgeGreen]}><Text style={[s.badgeText, { color: '#22c55e' }]}>Confirmed</Text></View>}
-              {t.status === 'completed' && <View style={[s.badge, s.badgeBlue]}><Text style={[s.badgeText, { color: '#60a5fa' }]}>✓ Attended</Text></View>}
-              {t.status === 'missed'    && <View style={[s.badge, s.badgeRed]}><Text style={[s.badgeText, { color: '#ef4444' }]}>Missed</Text></View>}
-            </View>
+          return (
+            <View key={t.id} style={[s.card, { backgroundColor: colors.card, borderColor: getCardBorderColor(t.status) }]}>
 
-            {/* Route */}
-            <View style={s.routeRow}>
-              <MapPin size={15} color={colors.tint} />
-              <Text style={[s.routeFrom, { color: colors.text }]} numberOfLines={1}>{t.from}</Text>
-              <ArrowRight size={13} color={colors.icon} />
-              <Text style={[s.routeTo, { color: colors.text }]} numberOfLines={1}>{t.to}</Text>
-            </View>
-
-            {/* Info Grid */}
-            <View style={s.infoGrid}>
-              {[
-                { label: 'PICKUP', value: t.pickup,     highlight: false, Icon: Clock     },
-                { label: 'BUS',    value: t.bus,        highlight: false, Icon: Bus       },
-                { label: 'RETURN', value: t.returnTime, highlight: true,  Icon: ArrowRight },
-              ].map((item, i) => (
-                <View key={i} style={[s.infoBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <Text style={[s.infoLabel, { color: colors.icon }]}>{item.label}</Text>
-                  <Text style={[s.infoValue, { color: item.highlight ? colors.tint : colors.text }]}>{item.value}</Text>
+              {/* Card Header */}
+              <View style={s.cardHeader}>
+                <View style={s.dateWrap}>
+                  <Calendar size={12} color={colors.icon} />
+                  <Text style={[s.dateText, { color: colors.icon }]}>{t.date}</Text>
                 </View>
-              ))}
-            </View>
-
-            {/* Actions */}
-            {t.status === 'upcoming' && (
-              <View style={s.actions}>
-                <TouchableOpacity
-                  style={[s.actionBtn, s.actionGreen]}
-                  onPress={() => handleMarkAttend(t.id)}
-                  activeOpacity={0.8}
-                >
-                  <Check size={14} color="#22c55e" />
-                  <Text style={[s.actionText, { color: '#22c55e' }]}>BOARDED</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[s.actionBtn, s.actionRed]}
-                  onPress={() => handleCancelBooking(t.id)}
-                  activeOpacity={0.8}
-                >
-                  <X size={14} color="#ef4444" />
-                  <Text style={[s.actionText, { color: '#ef4444' }]}>CANCEL</Text>
-                </TouchableOpacity>
+                <View style={[s.badge, { backgroundColor: badge.bg, borderColor: badge.border }]}>
+                  <Text style={[s.badgeText, { color: badge.text }]}>{badge.label}</Text>
+                </View>
               </View>
-            )}
-          </View>
-        ))}
+
+              {/* Route */}
+              <View style={s.routeRow}>
+                <MapPin size={15} color={colors.tint} />
+                <Text style={[s.routeFrom, { color: colors.text }]} numberOfLines={1}>{t.from}</Text>
+                <Text style={[s.routeArrow, { color: colors.icon }]}>→</Text>
+                <Text style={[s.routeTo, { color: colors.text }]} numberOfLines={1}>Campus</Text>
+              </View>
+
+              {/* Info chips */}
+              <View style={s.infoGrid}>
+                <View style={[s.infoBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <Text style={[s.infoLabel, { color: colors.icon }]}>SLOT</Text>
+                  <Text style={[s.infoValue, { color: colors.text }]}>{t.timeSlot || '—'}</Text>
+                </View>
+                <View style={[s.infoBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <Text style={[s.infoLabel, { color: colors.icon }]}>RETURN</Text>
+                  <Text style={[s.infoValue, { color: t.timeSlot === 'Return' ? colors.tint : colors.icon }]}>{t.returnTime}</Text>
+                </View>
+              </View>
+
+              {/* Actions — upcoming only */}
+              {t.status === 'upcoming' && (
+                <View style={s.actionsWrap}>
+
+                  {/* Attendance */}
+                  {alreadyMarked ? (
+                    <View style={[
+                      s.markedRow,
+                      t.attendanceStatus === 'completed'
+                        ? { backgroundColor: 'rgba(96,165,250,0.1)', borderColor: 'rgba(96,165,250,0.2)' }
+                        : { backgroundColor: 'rgba(239,68,68,0.1)',  borderColor: 'rgba(239,68,68,0.2)' },
+                    ]}>
+                      {t.attendanceStatus === 'completed'
+                        ? <><Check size={12} color="#60a5fa" /><Text style={[s.markedText, { color: '#60a5fa' }]}>TRIP COMPLETED</Text></>
+                        : <><X size={12} color="#ef4444" /><Text style={[s.markedText, { color: '#ef4444' }]}>MARKED AS MISSED</Text></>
+                      }
+                    </View>
+                  ) : (
+                    <View style={s.rowGap}>
+                      <TouchableOpacity
+                        style={[s.actionBtn, s.actionGreen, (!unlocked || attendanceLoading === t.id) && s.btnDisabled]}
+                        onPress={() => handleAttendance(t.id, 'completed')}
+                        disabled={!unlocked || attendanceLoading === t.id}
+                        activeOpacity={0.8}
+                      >
+                        <Check size={12} color="#22c55e" />
+                        <Text style={[s.actionText, { color: '#22c55e' }]}>
+                          {attendanceLoading === t.id ? 'Saving...' : 'Completed'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[s.actionBtn, s.actionYellow, (!unlocked || attendanceLoading === t.id) && s.btnDisabled]}
+                        onPress={() => handleAttendance(t.id, 'missed')}
+                        disabled={!unlocked || attendanceLoading === t.id}
+                        activeOpacity={0.8}
+                      >
+                        <X size={12} color="#eab308" />
+                        <Text style={[s.actionText, { color: '#eab308' }]}>
+                          {attendanceLoading === t.id ? 'Saving...' : 'Missed'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* Edit + Cancel */}
+                  <View style={s.rowGap}>
+                    <TouchableOpacity
+                      style={[s.actionBtn, s.actionAmber, !windowOpen && s.btnDisabled]}
+                      onPress={() => windowOpen && openEdit(t.raw)}
+                      disabled={!windowOpen}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[s.actionText, { color: colors.tint }]}>✎ Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[s.actionBtn, s.actionRed]}
+                      onPress={() => handleCancel(t.id)}
+                      activeOpacity={0.8}
+                    >
+                      <X size={12} color="#ef4444" />
+                      <Text style={[s.actionText, { color: '#ef4444' }]}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </View>
+          );
+        })}
 
         {/* Empty State */}
         {list.length === 0 && (
@@ -227,12 +411,107 @@ export default function MyTripsPage() {
               <Route size={32} color={colors.icon} />
             </View>
             <Text style={[s.emptyTitle, { color: colors.text }]}>No {tab} trips</Text>
-            <Text style={[s.emptySub, { color: colors.icon }]}>You don't have any bookings in this category.</Text>
+            <Text style={[s.emptySub, { color: colors.icon }]}>No bookings in this category.</Text>
           </View>
         )}
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Edit Modal */}
+      <Modal visible={editModal.open} transparent animationType="fade">
+        <View style={s.overlay}>
+          <View style={[s.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+
+            {/* Modal Header */}
+            <View style={s.modalHeader}>
+              <Text style={[s.modalTitle, { color: colors.text }]}>Edit Booking</Text>
+              <TouchableOpacity onPress={() => setEditModal({ open: false, booking: null })}>
+                <X size={18} color={colors.icon} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Error */}
+            {!!editError && (
+              <View style={s.editError}>
+                <Text style={s.editErrorText}>{editError}</Text>
+              </View>
+            )}
+
+            {/* Route Options */}
+            <Text style={[s.fieldLabel, { color: colors.icon }]}>Route</Text>
+            {routes.map((r: any) => (
+              <OptionBtn
+                key={r._id}
+                label={r.name}
+                selected={editRouteId === r._id}
+                onPress={() => setEditRouteId(r._id)}
+                colors={colors}
+              />
+            ))}
+
+            {/* Time Slot */}
+            <Text style={[s.fieldLabel, { color: colors.icon, marginTop: 12 }]}>Time Slot</Text>
+            <View style={s.rowGap}>
+              {['Morning', 'Return'].map(slot => (
+                <TouchableOpacity
+                  key={slot}
+                  style={[
+                    s.slotBtn,
+                    { backgroundColor: colors.background, borderColor: colors.border },
+                    editTimeSlot === slot && { backgroundColor: `${colors.tint}14`, borderColor: `${colors.tint}80` },
+                  ]}
+                  onPress={() => { setEditTimeSlot(slot); if (slot === 'Morning') setEditReturnTime(''); }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[s.slotTxt, { color: colors.icon }, editTimeSlot === slot && { color: colors.tint, fontWeight: '700' }]}>
+                    {slot}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Return Time */}
+            {editTimeSlot === 'Return' && (
+              <View style={{ marginTop: 12 }}>
+                <Text style={[s.fieldLabel, { color: colors.icon }]}>Return Time</Text>
+                {(settings?.returnTimeOptions || []).map((rt: string) => (
+                  <OptionBtn
+                    key={rt}
+                    label={rt}
+                    selected={editReturnTime === rt}
+                    onPress={() => setEditReturnTime(rt)}
+                    colors={colors}
+                  />
+                ))}
+              </View>
+            )}
+
+            {/* Modal Buttons */}
+            <View style={[s.rowGap, { marginTop: 16 }]}>
+              <TouchableOpacity
+                style={[s.modalBtn, { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }]}
+                onPress={() => setEditModal({ open: false, booking: null })}
+              >
+                <Text style={[s.modalBtnTxt, { color: colors.icon }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  s.modalBtn,
+                  { backgroundColor: colors.tint },
+                  (editSaving || !editRouteId || !editTimeSlot || (editTimeSlot === 'Return' && !editReturnTime)) && s.btnDisabled,
+                ]}
+                onPress={handleEditSave}
+                disabled={editSaving || !editRouteId || !editTimeSlot || (editTimeSlot === 'Return' && !editReturnTime)}
+              >
+                <Text style={[s.modalBtnTxt, { color: '#000' }]}>
+                  {editSaving ? 'Saving...' : 'Save Changes'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -243,43 +522,69 @@ const s = StyleSheet.create({
   loadWrap:      { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   loadText:      { fontSize: 13, fontWeight: '700' },
 
-  tabBar:        { flexDirection: 'row', borderWidth: 1, borderRadius: 14, padding: 4, marginBottom: 24, gap: 4 },
-  tab:           { flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center' },
-  tabText:       { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
-  tabCount:      { fontSize: 10, opacity: 0.5 },
+  toast:         { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, marginTop: 8, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 16, borderWidth: 1 },
+  toastText:     { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
 
-  card:          { borderWidth: 1, borderRadius: 20, padding: 20, marginBottom: 14 },
-  cardHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  tabBar:        { flexDirection: 'row', borderWidth: 1, borderRadius: 14, padding: 4, marginBottom: 20, gap: 4 },
+  tab:           { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center' },
+  tabText:       { fontSize: 10, fontWeight: '700', textTransform: 'capitalize' },
+  tabCount:      { fontSize: 9, opacity: 0.5 },
+
+  card:          { borderWidth: 1, borderRadius: 20, padding: 18, marginBottom: 14 },
+  cardHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   dateWrap:      { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dateText:      { fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
 
-  badge:         { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
-  badgeText:     { fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
-  badgeGreen:    { backgroundColor: 'rgba(34,197,94,0.1)',  borderColor: 'rgba(34,197,94,0.2)' },
-  badgeBlue:     { backgroundColor: 'rgba(59,130,246,0.1)', borderColor: 'rgba(59,130,246,0.2)' },
-  badgeRed:      { backgroundColor: 'rgba(239,68,68,0.1)',  borderColor: 'rgba(239,68,68,0.2)' },
+  badge:         { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
+  badgeText:     { fontSize: 9, fontWeight: '800', textTransform: 'uppercase' },
 
-  routeRow:      { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 },
-  routeFrom:     { flex: 1, fontSize: 15, fontWeight: '900' },
-  routeTo:       { flex: 1, fontSize: 15, fontWeight: '900' },
+  routeRow:      { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
+  routeFrom:     { flex: 1, fontSize: 14, fontWeight: '900' },
+  routeArrow:    { fontSize: 14, opacity: 0.3 },
+  routeTo:       { flex: 1, fontSize: 14, fontWeight: '900' },
 
-  infoGrid:      { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  infoGrid:      { flexDirection: 'row', gap: 8, marginBottom: 14 },
   infoBox:       { flex: 1, borderWidth: 1, borderRadius: 12, padding: 12 },
   infoLabel:     { fontSize: 8, fontWeight: '800', letterSpacing: 1.5, marginBottom: 6 },
   infoValue:     { fontSize: 11, fontWeight: '700' },
 
-  actions:       { flexDirection: 'row', gap: 10 },
-  actionBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 12, borderWidth: 1 },
-  actionText:    { fontSize: 11, fontWeight: '800', letterSpacing: 1 },
-  actionGreen:   { backgroundColor: 'rgba(34,197,94,0.1)',  borderColor: 'rgba(34,197,94,0.2)' },
-  actionRed:     { backgroundColor: 'rgba(239,68,68,0.05)', borderColor: 'rgba(239,68,68,0.2)' },
+  actionsWrap:   { gap: 8 },
+  rowGap:        { flexDirection: 'row', gap: 8 },
+
+  markedRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 12, borderWidth: 1 },
+  markedText:    { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+
+  actionBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 11, borderRadius: 12, borderWidth: 1 },
+  actionText:    { fontSize: 10, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
+  actionGreen:   { backgroundColor: 'rgba(34,197,94,0.1)',   borderColor: 'rgba(34,197,94,0.2)' },
+  actionYellow:  { backgroundColor: 'rgba(234,179,8,0.1)',   borderColor: 'rgba(234,179,8,0.2)' },
+  actionAmber:   { backgroundColor: 'rgba(247,160,27,0.1)',  borderColor: 'rgba(247,160,27,0.2)' },
+  actionRed:     { backgroundColor: 'rgba(239,68,68,0.05)',  borderColor: 'rgba(239,68,68,0.2)' },
+  btnDisabled:   { opacity: 0.3 },
 
   emptyWrap:     { alignItems: 'center', justifyContent: 'center', paddingTop: 80, opacity: 0.4 },
   emptyIcon:     { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   emptyTitle:    { fontSize: 16, fontWeight: '800', textTransform: 'uppercase', marginBottom: 6 },
   emptySub:      { fontSize: 12, textAlign: 'center' },
-});
-import { BOTTOM_BAR_HEIGHT } from '../../src/hooks/useBottomBarHeight';
 
-// في الـ styles
-<View style={{ flex: 1, paddingBottom: BOTTOM_BAR_HEIGHT }}></View>
+  overlay:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 20 },
+  modalCard:     { borderWidth: 1, borderRadius: 24, padding: 24, maxHeight: '90%' },
+  modalHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle:    { fontSize: 15, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+
+  editError:     { backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)', borderRadius: 12, padding: 12, marginBottom: 12 },
+  editErrorText: { color: '#ef4444', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
+
+  fieldLabel:    { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8 },
+
+  optBtn:        { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14, marginBottom: 8 },
+  optLabel:      { flex: 1, fontSize: 13, fontWeight: '600' },
+  checkCircle:   { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  checkText:     { fontSize: 11, fontWeight: '700' },
+
+  slotBtn:       { flex: 1, paddingVertical: 12, borderRadius: 14, borderWidth: 1, alignItems: 'center' },
+  slotTxt:       { fontSize: 13, fontWeight: '600' },
+
+  modalBtn:      { flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
+  modalBtnTxt:   { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
+});
