@@ -1,29 +1,31 @@
-import React, { useState } from 'react';
+import { useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ActivityIndicator, KeyboardAvoidingView,
-  Platform, ScrollView
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Bus, Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
-import Api from '../../src/services/api';
-import { useAuth } from '../../src/context/AuthContext';
+  ActivityIndicator, KeyboardAvoidingView,
+  Platform, ScrollView, StyleSheet
+} from "react-native";
+import { router } from "expo-router";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Bus, Mail, Lock, Eye, EyeOff } from "lucide-react-native";
+import { useAuth } from "../../src/context/AuthContext";
+import { useThemeColor } from "../../constants/theme";
+import api from "../../src/services/api";
 
 const loginSchema = z.object({
-  email:    z.string().email('Invalid email'),
-  password: z.string().min(6, 'Min 6 characters'),
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
 });
+
 type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginScreen() {
-  const router = useRouter();
   const { login } = useAuth();
+  const colors = useThemeColor();
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading]           = useState(false);
-  const [serverError, setServerError]   = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
 
   const { control, handleSubmit, formState: { errors } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -33,13 +35,19 @@ export default function LoginScreen() {
     setLoading(true);
     setServerError(null);
     try {
-      const response = await Api.post('/auth/login', data);
+      const response = await api.post("/auth/login", data);
       const { token, user } = response.data;
       if (token) {
-        await login(token, user.role);
+       await login(token, user.role);
+
+        if (user.role === "admin") {
+          router.replace("/(admin)/dashboard");
+        } else {
+          router.replace("/(student)/dashboard");
+        }
       }
     } catch (error: any) {
-      setServerError(error.response?.data?.message || 'Invalid email or password');
+      setServerError(error.response?.data?.message || "Invalid email or password");
     } finally {
       setLoading(false);
     }
@@ -47,150 +55,165 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={s.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1, backgroundColor: colors.background }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
-
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Logo */}
-        <View style={s.logoWrap}>
-          <TouchableOpacity
-            style={s.logoBox}
-            onPress={() => router.push('/(auth)/welcome')}
-            activeOpacity={0.85}
-          >
-            <Bus size={32} color="#000" fill="#000" />
+        <View style={styles.logoSection}>
+          <TouchableOpacity style={styles.logoBox}>
+            <Bus size={32} color={colors.background} fill={colors.background} />
           </TouchableOpacity>
-          <Text style={s.logoTitle}>SmartBus</Text>
-          <Text style={s.logoSub}>WELCOME BACK</Text>
+          <Text style={[styles.appName, { color: colors.text }]}>SmartBus</Text>
+          <Text style={[styles.welcomeText, { color: colors.icon }]}>WELCOME BACK</Text>
         </View>
 
         {/* Card */}
-        <View style={s.card}>
-          <Text style={s.cardTitle}>Sign In</Text>
-          <Text style={s.cardSub}>Access your institutional portal</Text>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Sign In</Text>
+          <Text style={[styles.cardSubtitle, { color: colors.icon }]}>Access your institutional portal</Text>
 
           {/* Server Error */}
           {serverError && (
-            <View style={s.errorBox}>
-              <Text style={s.errorBoxText}>{serverError}</Text>
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{serverError}</Text>
             </View>
           )}
 
           {/* Email */}
-          <View style={s.fieldWrap}>
-            <Text style={s.label}>INSTITUTIONAL EMAIL</Text>
-            <Controller
-              control={control}
-              name="email"
-              render={({ field: { onChange, value } }) => (
-                <View style={[s.inputWrap, errors.email && s.inputWrapErr]}>
-                  <Mail size={18} color="#8a8d91" style={s.inputIcon} />
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.label, { color: colors.icon }]}>INSTITUTIONAL EMAIL</Text>
+            <View style={[styles.inputWrapper, { backgroundColor: colors.card, borderColor: colors.border }, errors.email && styles.inputError]}>
+              <Mail size={18} color={colors.icon} style={styles.inputIcon} />
+              <Controller
+                control={control}
+                name="email"
+                render={({ field: { onChange, value } }) => (
                   <TextInput
-                    style={s.input}
+                    style={[styles.input, { color: colors.text }]}
                     placeholder="name@university.edu"
-                    placeholderTextColor="#555"
+                    placeholderTextColor={colors.border}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     value={value}
                     onChangeText={onChange}
                     editable={!loading}
                   />
-                </View>
-              )}
-            />
-            {errors.email && <Text style={s.fieldErr}>{errors.email.message}</Text>}
+                )}
+              />
+            </View>
+            {errors.email && <Text style={styles.fieldError}>{errors.email.message}</Text>}
           </View>
 
           {/* Password */}
-          <View style={s.fieldWrap}>
-            <Text style={s.label}>PASSWORD</Text>
-            <Controller
-              control={control}
-              name="password"
-              render={({ field: { onChange, value } }) => (
-                <View style={[s.inputWrap, errors.password && s.inputWrapErr]}>
-                  <Lock size={18} color="#8a8d91" style={s.inputIcon} />
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.label, { color: colors.icon }]}>PASSWORD</Text>
+            <View style={[styles.inputWrapper, { backgroundColor: colors.card, borderColor: colors.border }, errors.password && styles.inputError]}>
+              <Lock size={18} color={colors.icon} style={styles.inputIcon} />
+              <Controller
+                control={control}
+                name="password"
+                render={({ field: { onChange, value } }) => (
                   <TextInput
-                    style={[s.input, s.passInput]}
+                    style={[styles.input, { color: colors.text }]}
                     placeholder="••••••••••••"
-                    placeholderTextColor="#555"
+                    placeholderTextColor={colors.border}
                     secureTextEntry={!showPassword}
                     value={value}
                     onChangeText={onChange}
                     editable={!loading}
                   />
-                  <TouchableOpacity
-                    style={s.eyeBtn}
-                    onPress={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword
-                      ? <EyeOff size={18} color="#8a8d91" />
-                      : <Eye    size={18} color="#8a8d91" />
-                    }
-                  </TouchableOpacity>
-                </View>
-              )}
-            />
-            {errors.password && <Text style={s.fieldErr}>{errors.password.message}</Text>}
+                )}
+              />
+              <TouchableOpacity
+                onPress={() => setShowPassword(!showPassword)}
+                style={styles.eyeBtn}
+              >
+                {showPassword
+                  ? <EyeOff size={18} color={colors.icon} />
+                  : <Eye size={18} color={colors.icon} />
+                }
+              </TouchableOpacity>
+            </View>
+            {errors.password && <Text style={styles.fieldError}>{errors.password.message}</Text>}
           </View>
 
           {/* Submit */}
           <TouchableOpacity
-            style={[s.btn, loading && s.btnDisabled]}
+            style={[styles.submitBtn, loading && styles.submitDisabled]}
             onPress={handleSubmit(onSubmit)}
             disabled={loading}
             activeOpacity={0.85}
           >
             {loading
-              ? <ActivityIndicator color="#000" />
-              : <Text style={s.btnText}>Sign In</Text>
+              ? <ActivityIndicator color={colors.background} />
+              : <Text style={[styles.submitText, { color: colors.background }]}>Sign In</Text>
             }
           </TouchableOpacity>
+
+   
         </View>
 
-        <Text style={s.footer}>SmartBus Transportation System © 2026</Text>
+        <Text style={[styles.copyright, { color: colors.icon }]}>
+          SmartBus Transportation System © 2026
+        </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-const s = StyleSheet.create({
-  root:         { flex: 1, backgroundColor: '#0f1115' },
-  scroll:       { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+const styles = StyleSheet.create({
+  scroll: { flexGrow: 1, justifyContent: "center", padding: 24 },
 
-  // Logo
-  logoWrap:     { alignItems: 'center', marginBottom: 32 },
-  logoBox:      { width: 64, height: 64, backgroundColor: '#f7a01b', borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  logoTitle:    { fontSize: 28, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },
-  logoSub:      { fontSize: 10, color: '#8a8d91', letterSpacing: 3, marginTop: 4, fontWeight: '600' },
+  logoSection: { alignItems: "center", marginBottom: 32 },
+  logoBox: {
+    width: 64, height: 64, backgroundColor: "#f7a01b",
+    borderRadius: 20, alignItems: "center", justifyContent: "center",
+  },
+  appName: { fontSize: 28, fontWeight: "800", marginTop: 14, letterSpacing: -0.5 },
+  welcomeText: { fontSize: 10, letterSpacing: 3, marginTop: 4, fontWeight: "600" },
 
-  // Card
-  card:         { width: '100%', maxWidth: 420, backgroundColor: '#1c1e26', borderWidth: 1, borderColor: '#2d3036', borderRadius: 32, padding: 28 },
-  cardTitle:    { fontSize: 22, fontWeight: '700', color: '#fff', marginBottom: 4 },
-  cardSub:      { fontSize: 13, color: '#8a8d91', marginBottom: 24, fontWeight: '500' },
+  card: { borderWidth: 1, borderRadius: 32, padding: 28 },
+  cardTitle: { fontSize: 22, fontWeight: "700", marginBottom: 4 },
+  cardSubtitle: { fontSize: 13, marginBottom: 24 },
 
-  // Error
-  errorBox:     { backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)', borderRadius: 12, padding: 12, marginBottom: 16 },
-  errorBoxText: { color: '#f87171', fontSize: 12, textAlign: 'center', fontWeight: '500' },
+  errorBox: {
+    backgroundColor: "rgba(239,68,68,0.1)", borderWidth: 1,
+    borderColor: "rgba(239,68,68,0.2)", borderRadius: 12,
+    padding: 12, marginBottom: 16,
+  },
+  errorText: { color: "#f87171", fontSize: 12, textAlign: "center" },
 
-  // Fields
-  fieldWrap:    { marginBottom: 16 },
-  label:        { fontSize: 10, color: '#8a8d91', fontWeight: '700', letterSpacing: 2, marginBottom: 6 },
+  fieldGroup: { marginBottom: 16 },
+  label: { fontSize: 10, fontWeight: "700", letterSpacing: 1.5, marginBottom: 6, marginLeft: 4 },
+  inputWrapper: {
+    flexDirection: "row", alignItems: "center",
+    borderWidth: 1, borderRadius: 14,
+  },
+  inputError: { borderColor: "rgba(239,68,68,0.5)" },
+  inputIcon: { marginLeft: 14 },
+  input: { flex: 1, fontSize: 14, paddingVertical: 14, paddingHorizontal: 10 },
+  eyeBtn: { padding: 14 },
+  fieldError: { color: "#f87171", fontSize: 10, marginTop: 4, marginLeft: 4, fontWeight: "500" },
 
-  inputWrap:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#262a33', borderWidth: 1, borderColor: '#2d3036', borderRadius: 12 },
-  inputWrapErr: { borderColor: '#ef4444' },
-  inputIcon:    { marginLeft: 14 },
-  input:        { flex: 1, paddingVertical: 14, paddingHorizontal: 10, color: '#fff', fontSize: 14 },
-  passInput:    { paddingRight: 0 },
-  eyeBtn:       { padding: 14 },
+  submitBtn: {
+    backgroundColor: "#f7a01b", borderRadius: 16,
+    paddingVertical: 16, alignItems: "center",
+    marginTop: 8, marginBottom: 8,
+  },
+  submitDisabled: { opacity: 0.7 },
+  submitText: { fontSize: 15, fontWeight: "700" },
 
-  fieldErr:     { color: '#f87171', fontSize: 10, marginTop: 4, fontWeight: '500' },
+  footer: {
+    flexDirection: "row", justifyContent: "center",
+    alignItems: "center", marginTop: 20,
+    paddingTop: 20, borderTopWidth: 1,
+  },
+  footerText: { fontSize: 13 },
+  footerLink: { color: "#f7a01b", fontSize: 13, fontWeight: "700" },
 
-  // Button
-  btn:          { backgroundColor: '#f7a01b', borderRadius: 16, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
-  btnDisabled:  { opacity: 0.7 },
-  btnText:      { color: '#000', fontWeight: '700', fontSize: 15 },
-
-  footer:       { marginTop: 32, color: '#8a8d91', fontSize: 10, fontWeight: '700', letterSpacing: 3, opacity: 0.4 },
+  copyright: { fontSize: 9, textAlign: "center", marginTop: 24, letterSpacing: 2, fontWeight: "600", opacity: 0.4 },
 });

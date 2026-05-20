@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { ThemeProvider } from '../src/context/ThemeContext';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 function RootGuard() {
   const { token, userRole, isLoading } = useAuth();
@@ -11,14 +12,25 @@ function RootGuard() {
 
   useEffect(() => {
     if (isLoading) return;
-    const inAuth = segments[0] === '(auth)';
-    if (!token && !inAuth) {
-      router.replace('/(auth)/login');
-    } else if (token && inAuth) {
-      router.replace(
-        userRole === 'admin' ? '/(admin)/dashboard' : '/(student)/dashboard'
-      );
-    }
+
+    const checkOnboarding = async () => {
+      const onboarded = await AsyncStorage.getItem("onboarded");
+      const inAuth = segments[0] === '(auth)';
+
+      if (!token) {
+        if (!onboarded) {
+          router.replace('/(auth)/onboarding');
+        } else if (!inAuth) {
+          router.replace('/(auth)/login');
+        }
+      } else if (token && inAuth) {
+        router.replace(
+          userRole === 'admin' ? '/(admin)/dashboard' : '/(student)/dashboard'
+        );
+      }
+    };
+
+    checkOnboarding();
   }, [token, isLoading]);
 
   if (isLoading) {
