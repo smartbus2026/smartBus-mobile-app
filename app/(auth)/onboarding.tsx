@@ -41,7 +41,7 @@ const SLIDES = [
     title: "Safe & Secure",
     subtitle: "Your Safety First",
     desc: "Your data is protected. Book with confidence and travel safely every day.",
-    color: "#a855f7",
+    color: "#f7a01b",
   },
 ];
 
@@ -153,7 +153,7 @@ export default function OnboardingScreen() {
           activeOpacity={0.85}
         >
           <Text style={[styles.nextText, { color: colors.background }]}>
-            {currentIndex === SLIDES.length - 1 ? "Get Started 🚀" : "Next"}
+            {currentIndex === SLIDES.length - 1 ? "Get Started " : "Next"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -168,7 +168,8 @@ export default function OnboardingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: "center", justifyContent: "center" },
+  container: { flex: 1, alignItems: "center", justifyContent: "center" ,  paddingBottom: 20, // ضيفي
+},
 
   skipBtn: { position: "absolute", top: 60, right: 24, zIndex: 10, padding: 8 },
   skipText: { fontSize: 13, fontWeight: "700" },
@@ -197,15 +198,16 @@ const styles = StyleSheet.create({
   dot: { height: 8, borderRadius: 4, width: 8 },
   dotActive: { width: 28 },
 
-  btnsRow: { flexDirection: "row", gap: 12, paddingHorizontal: 32, width: "100%", marginBottom: 16 },
+  btnsRow: { flexDirection: "row", gap: 12, paddingHorizontal: 32, width: "100%", marginBottom: 16,  paddingBottom: 20, 
+ },
   backBtn: {
-    paddingVertical: 18, paddingHorizontal: 24,
+    paddingVertical: 16, paddingHorizontal: 24,
     borderRadius: 20, borderWidth: 1, alignItems: "center",
   },
   backBtnText: { fontSize: 15, fontWeight: "700" },
   nextBtn: {
     paddingVertical: 18, borderRadius: 20,
-    alignItems: "center", width: "100%",
+    alignItems: "center", width: "100%",paddingHorizontal: 20
   },
   nextText: { fontSize: 16, fontWeight: "900" },
 
