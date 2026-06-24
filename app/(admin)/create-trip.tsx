@@ -5,7 +5,7 @@ import {
   Platform, ScrollView, Modal
 } from "react-native";
 import { router } from "expo-router";
-import { Bus, Users, Clock, CheckCircle, Plus, ChevronDown, Save } from "lucide-react-native";
+import { Bus, Users, Clock, CheckCircle, Plus, ChevronDown, Save, Timer } from "lucide-react-native";
 import api from "../../src/services/api";
 import { useThemeColor } from "../../constants/theme";
 import TopBar from "../../src/components/TopBar";
@@ -26,7 +26,6 @@ export default function CreateBusScreen() {
   
   const [busForm, setBusForm] = useState({
     busCode: '',
-    driverName: '',
     capacity: '45'
   });
 
@@ -37,6 +36,9 @@ export default function CreateBusScreen() {
     booking_close_minute: 0,
   });
 
+  // Monthly Quota State (Matched from Web)
+  const [quota, setQuota] = useState({ used: 0, total: 308 });
+
   const [modalVisible, setModalVisible] = useState(false);
   const [modalState, setModalState] = useState({ type: "success", message: "" });
 
@@ -44,24 +46,38 @@ export default function CreateBusScreen() {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerData, setPickerData] = useState<{ options: (number | string)[], type: string }>({ options: [], type: '' });
 
-  // ── Fetch Settings ──
+  // ── Fetch Critical & Non-Critical Data ──
   useEffect(() => {
-    const fetchSettings = async () => {
+    const fetchAllData = async () => {
+      // 1. Fetch Settings
       try {
-        const res = await api.get('/settings');
-        if (res.data?.data?.settings) {
-          setSettings(res.data.data.settings);
+        const settingsRes = await api.get('/settings');
+        if (settingsRes.data?.data?.settings) {
+          setSettings(settingsRes.data.data.settings);
         }
       } catch (err) {
         console.log("Failed to fetch settings", err);
       }
+
+      // 2. Fetch Fleet Quota (Matched from Web)
+      try {
+        const quotaRes = await api.get('/buses/quota');
+        if (quotaRes.data) {
+          setQuota({ used: quotaRes.data.usedCapacity || 0, total: quotaRes.data.totalCapacity || 308 });
+        }
+      } catch (err) {
+        console.log("Failed to fetch fleet quota", err);
+      }
     };
-    fetchSettings();
+    fetchAllData();
   }, []);
+
+  const quotaPercentage = Math.min((quota.used / quota.total) * 100, 100);
+  const quotaColor = quotaPercentage < 70 ? (colors.success || '#10b981') : quotaPercentage < 85 ? '#f59e0b' : '#ef4444';
 
   // ── Handlers ──
   const handleCreateBus = async () => {
-    if (!busForm.busCode || !busForm.driverName || !busForm.capacity) {
+    if (!busForm.busCode || !busForm.capacity) {
       setModalState({ type: "error", message: "Please fill all bus fields." });
       setModalVisible(true);
       return;
@@ -70,11 +86,11 @@ export default function CreateBusScreen() {
     setIsSubmitting(true);
     try {
       await api.post('/buses', {
-        ...busForm,
+        busCode: busForm.busCode,
         capacity: parseInt(busForm.capacity) || 45
       });
       setModalState({ type: "success", message: "Bus created successfully!" });
-      setBusForm({ busCode: '', driverName: '', capacity: '45' });
+      setBusForm({ busCode: '', capacity: '45' });
       setModalVisible(true);
     } catch (err: any) {
       setModalState({ type: "error", message: err.response?.data?.message || "Failed to create bus." });
@@ -108,7 +124,7 @@ export default function CreateBusScreen() {
   const getAmPm = (h24: number) => h24 >= 12 ? "PM" : "AM";
 
   const updateHour = (type: 'open' | 'close', value: number | string) => {
-    if (typeof value === 'string') { // AM or PM
+    if (typeof value === 'string') {
       const isPM = value === 'PM';
       setSettings(prev => {
         const currentH = type === 'open' ? prev.booking_open_hour : prev.booking_close_hour;
@@ -116,7 +132,7 @@ export default function CreateBusScreen() {
         const newH = isPM ? (h12 === 0 ? 12 : h12 + 12) : (h12 === 0 ? 0 : h12);
         return { ...prev, [type === 'open' ? 'booking_open_hour' : 'booking_close_hour']: newH };
       });
-    } else { // Hour number (1-12)
+    } else {
       setSettings(prev => {
         const currentH = type === 'open' ? prev.booking_open_hour : prev.booking_close_hour;
         const isPM = currentH >= 12;
@@ -139,32 +155,44 @@ export default function CreateBusScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <TopBar title="Create Trip" showMenu showSettings onSettingsPress={() => router.push('/(admin)/settings' as any)} />
+      <TopBar title="Create Bus" showMenu showSettings onSettingsPress={() => router.push('/(admin)/settings' as any)} />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
 
-          {/* ── 1. Create Bus Card ── */}
-          <View style={{ borderWidth: 1, borderRadius: 24, padding: 20, backgroundColor: colors.card, borderColor: colors.border, marginBottom: 24 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+          {/* ── 1. Monthly Fleet Quota (Matched from Web) ── */}
+          <View style={{ borderWidth: 1, borderRadius: 24, padding: 24, backgroundColor: colors.card, borderColor: colors.border, marginBottom: 20 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 16 }}>
+              <Text style={{ fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>Monthly Fleet Quota</Text>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: colors.icon }}>{quota.used} / {quota.total} IN SERVICE</Text>
+            </View>
+            <View style={{ height: 12, backgroundColor: `${colors.text}10`, borderRadius: 6, overflow: 'hidden', borderWidth: 1, borderColor: colors.border }}>
+              <View style={{ height: '100%', width: `${quotaPercentage}%`, backgroundColor: quotaColor, borderRadius: 6 }} />
+            </View>
+          </View>
+
+          {/* ── 2. Create Bus Form ── */}
+          <View style={{ borderWidth: 1, borderRadius: 24, padding: 24, backgroundColor: colors.card, borderColor: colors.border, marginBottom: 20 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 }}>
               <View style={{ backgroundColor: `${colors.tint}1A`, padding: 10, borderRadius: 14 }}>
                 <Plus size={20} color={colors.tint} />
               </View>
               <View>
                 <Text style={{ fontSize: 16, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>Create Bus</Text>
-                <Text style={{ fontSize: 10, fontWeight: '700', color: colors.icon }}>ADD NEW VEHICLES TO FLEET</Text>
+                <Text style={{ fontSize: 10, fontWeight: '800', color: colors.icon }}>ADD NEW VEHICLES TO FLEET</Text>
               </View>
             </View>
 
-            {/* Bus Fields */}
-            <View style={{ gap: 16 }}>
+            <View style={{ gap: 18 }}>
               <View>
-                <Text style={{ fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6, color: colors.icon }}>Bus Number / Plate</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, paddingHorizontal: 14, borderWidth: 1, backgroundColor: colors.background, borderColor: colors.border }}>
-                  <Bus size={18} color={colors.icon} />
+                <Text style={{ fontSize: 10, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8, color: colors.icon }}>
+                  Bus Number / Plate
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, paddingHorizontal: 16, borderWidth: 1, backgroundColor: colors.background, borderColor: colors.border }}>
+                  <Bus size={16} color={colors.icon} />
                   <TextInput
-                    style={{ flex: 1, fontSize: 13, fontWeight: '700', paddingVertical: 14, paddingHorizontal: 10, color: colors.text }}
-                    placeholder="e.g. Bus 101"
+                    style={{ flex: 1, fontSize: 13, fontWeight: '700', paddingVertical: 16, paddingHorizontal: 12, color: colors.text }}
+                    placeholder="Enter bus plate..."
                     placeholderTextColor={colors.icon}
                     value={busForm.busCode}
                     onChangeText={(t) => setBusForm(prev => ({ ...prev, busCode: t }))}
@@ -173,25 +201,13 @@ export default function CreateBusScreen() {
               </View>
 
               <View>
-                <Text style={{ fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6, color: colors.icon }}>Driver Name</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, paddingHorizontal: 14, borderWidth: 1, backgroundColor: colors.background, borderColor: colors.border }}>
-                  <Users size={18} color={colors.icon} />
+                <Text style={{ fontSize: 10, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8, color: colors.icon }}>
+                  Total Seats Capacity
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, paddingHorizontal: 16, borderWidth: 1, backgroundColor: colors.background, borderColor: colors.border }}>
+                  <Users size={16} color={colors.icon} />
                   <TextInput
-                    style={{ flex: 1, fontSize: 13, fontWeight: '700', paddingVertical: 14, paddingHorizontal: 10, color: colors.text }}
-                    placeholder="e.g. Ahmed Ali"
-                    placeholderTextColor={colors.icon}
-                    value={busForm.driverName}
-                    onChangeText={(t) => setBusForm(prev => ({ ...prev, driverName: t }))}
-                  />
-                </View>
-              </View>
-
-              <View>
-                <Text style={{ fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6, color: colors.icon }}>Total Seats Capacity</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, paddingHorizontal: 14, borderWidth: 1, backgroundColor: colors.background, borderColor: colors.border }}>
-                  <Users size={18} color={colors.icon} />
-                  <TextInput
-                    style={{ flex: 1, fontSize: 13, fontWeight: '700', paddingVertical: 14, paddingHorizontal: 10, color: colors.text }}
+                    style={{ flex: 1, fontSize: 13, fontWeight: '700', paddingVertical: 16, paddingHorizontal: 12, color: colors.text }}
                     placeholder="45"
                     keyboardType="numeric"
                     placeholderTextColor={colors.icon}
@@ -204,55 +220,60 @@ export default function CreateBusScreen() {
               <TouchableOpacity
                 onPress={handleCreateBus}
                 disabled={isSubmitting}
-                style={{ borderRadius: 16, paddingVertical: 16, alignItems: 'center', marginTop: 10, backgroundColor: colors.tint, opacity: isSubmitting ? 0.7 : 1 }}
+                style={{ borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 8, backgroundColor: colors.tint, opacity: isSubmitting ? 0.7 : 1, flexDirection: 'row', justifyContent: 'center', gap: 8 }}
               >
-                {isSubmitting ? <ActivityIndicator color="#000" /> : <Text style={{ fontSize: 12, fontWeight: '900', letterSpacing: 2, textTransform: 'uppercase', color: '#000' }}>Create Bus</Text>}
+                {isSubmitting ? <ActivityIndicator color="#000" /> : (
+                  <>
+                    <Plus size={16} color="#000" />
+                    <Text style={{ fontSize: 12, fontWeight: '900', letterSpacing: 2, textTransform: 'uppercase', color: '#000' }}>Create Bus</Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* ── 2. Booking Window Settings Card ── */}
-          <View style={{ borderWidth: 1, borderRadius: 24, padding: 20, backgroundColor: colors.card, borderColor: colors.border }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+          {/* ── 3. Booking Window Settings Card ── */}
+          <View style={{ borderWidth: 1, borderRadius: 24, padding: 24, backgroundColor: colors.card, borderColor: colors.border }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 }}>
               <View style={{ backgroundColor: `${colors.tint}1A`, padding: 10, borderRadius: 14 }}>
-                <Clock size={20} color={colors.tint} />
+                <Timer size={20} color={colors.tint} />
               </View>
               <View>
                 <Text style={{ fontSize: 16, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>Booking Window</Text>
-                <Text style={{ fontSize: 10, fontWeight: '700', color: colors.icon }}>CONTROL REGISTRATION TIMES</Text>
+                <Text style={{ fontSize: 10, fontWeight: '800', color: colors.icon }}>CONTROL REGISTRATION TIMES</Text>
               </View>
             </View>
 
             {/* Time Pickers */}
             {(['open', 'close'] as const).map((type) => (
-              <View key={type} style={{ marginBottom: 20 }}>
-                <Text style={{ fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8, color: colors.icon }}>
+              <View key={type} style={{ marginBottom: 24 }}>
+                <Text style={{ fontSize: 10, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10, color: colors.icon }}>
                   Booking {type === 'open' ? 'Opens At' : 'Closes At'}
                 </Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   
                   {/* Hour */}
                   <TouchableOpacity onPress={() => openPicker(`${type}Hour`, [12,1,2,3,4,5,6,7,8,9,10,11])}
-                    style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, padding: 14, borderRadius: 14 }}>
+                    style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 12 }}>
                     <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>{String(formatHour12(type === 'open' ? settings.booking_open_hour : settings.booking_close_hour)).padStart(2, '0')}</Text>
                     <ChevronDown size={14} color={colors.icon} />
                   </TouchableOpacity>
 
                   {/* Minute */}
                   <TouchableOpacity onPress={() => openPicker(`${type}Minute`, [0, 15, 30, 45])}
-                    style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, padding: 14, borderRadius: 14 }}>
+                    style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 12 }}>
                     <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>{String(type === 'open' ? settings.booking_open_minute : settings.booking_close_minute).padStart(2, '0')}</Text>
                     <ChevronDown size={14} color={colors.icon} />
                   </TouchableOpacity>
 
                   {/* AM/PM */}
                   <TouchableOpacity onPress={() => openPicker(`${type}Period`, ['AM', 'PM'])}
-                    style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.tint, padding: 14, borderRadius: 14 }}>
+                    style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.tint, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 12 }}>
                     <Text style={{ fontSize: 14, fontWeight: '900', color: colors.tint }}>{getAmPm(type === 'open' ? settings.booking_open_hour : settings.booking_close_hour)}</Text>
                     <ChevronDown size={14} color={colors.tint} />
                   </TouchableOpacity>
                 </View>
-                <Text style={{ fontSize: 10, fontWeight: '800', marginTop: 8, color: type === 'open' ? (colors.success || '#22c55e') : '#ef4444' }}>
+                <Text style={{ fontSize: 10, fontWeight: '800', marginTop: 10, color: type === 'open' ? (colors.success || '#10b981') : '#ef4444' }}>
                   {type === 'open' ? 'OPENS:' : 'CLOSES:'} {formatHour12(type === 'open' ? settings.booking_open_hour : settings.booking_close_hour)}:{String(type === 'open' ? settings.booking_open_minute : settings.booking_close_minute).padStart(2, '0')} {getAmPm(type === 'open' ? settings.booking_open_hour : settings.booking_close_hour)}
                 </Text>
               </View>
@@ -261,7 +282,7 @@ export default function CreateBusScreen() {
             <TouchableOpacity
               onPress={handleSaveSettings}
               disabled={isSavingSettings}
-              style={{ borderRadius: 16, paddingVertical: 16, alignItems: 'center', marginTop: 4, flexDirection: 'row', justifyContent: 'center', gap: 8, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.tint, opacity: isSavingSettings ? 0.7 : 1 }}
+              style={{ borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 4, flexDirection: 'row', justifyContent: 'center', gap: 8, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.tint, opacity: isSavingSettings ? 0.7 : 1 }}
             >
               {isSavingSettings ? <ActivityIndicator color={colors.tint} /> : (
                 <>
@@ -279,10 +300,10 @@ export default function CreateBusScreen() {
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: "rgba(0,0,0,0.6)", padding: 20 }}>
           <View style={{ width: '100%', maxWidth: 320, backgroundColor: colors.card, borderRadius: 24, padding: 24, borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}>
             <View style={{ width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', marginBottom: 16, borderWidth: 2,
-              backgroundColor: modalState.type === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
-              borderColor: modalState.type === 'success' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'
+              backgroundColor: modalState.type === 'success' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+              borderColor: modalState.type === 'success' ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'
             }}>
-              {modalState.type === 'success' ? <CheckCircle size={32} color="#22c55e" /> : <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#ef4444' }}>!</Text>}
+              {modalState.type === 'success' ? <CheckCircle size={32} color="#10b981" /> : <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#ef4444' }}>!</Text>}
             </View>
             <Text style={{ fontSize: 18, fontWeight: '900', textTransform: 'uppercase', color: colors.text, marginBottom: 8 }}>
               {modalState.type === 'success' ? 'Success!' : 'Action Failed'}
@@ -307,7 +328,7 @@ export default function CreateBusScreen() {
       <Modal visible={pickerVisible} transparent animationType="slide">
         <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: "rgba(0,0,0,0.5)" }}>
           <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 40, maxHeight: '50%' }}>
-            <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' }}>
+            <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' }}>
               <Text style={{ fontSize: 12, fontWeight: '900', textTransform: 'uppercase', color: colors.icon }}>Select Option</Text>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
