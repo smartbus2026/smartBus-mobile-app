@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,10 +6,16 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
+  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import Api from '../../src/services/api';
 import { useThemeColor } from "../../constants/theme";
+import TopBar from '../../src/components/TopBar';
+
+const { width } = Dimensions.get('window');
+const cardWidth = (width - 40 - 12) / 2; // 40 for horizontal padding, 12 for gap
 
 interface BookingRecord {
   _id: string;
@@ -22,7 +28,8 @@ interface BookingRecord {
   specificReturnTime?: string;
 }
 
-export default function AttendancePage() {
+export default function AttendanceScreen() {
+  const router = useRouter();
   const colors = useThemeColor();
   const [bookings, setBookings] = useState<BookingRecord[]>([]);
   const [settings, setSettings] = useState<any>(null);
@@ -94,6 +101,7 @@ export default function AttendancePage() {
 
     if (now < tripStartTime) return { isStarted: false, isExpired: false };
 
+    // Expired after 120 minutes
     const expiredTime = new Date(tripStartTime.getTime() + 120 * 60000);
     if (now > expiredTime) return { isStarted: true, isExpired: true };
 
@@ -122,13 +130,21 @@ export default function AttendancePage() {
     return (
       <View style={[s.loadWrap, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.tint} />
-        <Text style={[s.loadText, { color: colors.icon }]}>Loading attendance...</Text>
+        <Text style={[s.loadText, { color: colors.icon }]}>LOADING ATTENDANCE...</Text>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={[s.root, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[s.root, { backgroundColor: colors.background }]} edges={['bottom', 'left', 'right']}>
+      
+      <TopBar
+        title="My Attendance"
+        showMenu
+        showSettings
+        onSettingsPress={() => router.push('/(student)/settings' as any)}
+      />
+
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={s.scroll}
@@ -136,19 +152,17 @@ export default function AttendancePage() {
       >
         {/* Header */}
         <View style={s.header}>
-          <Text style={[s.headerTitle, { color: colors.text }]}>
-            My <Text style={{ color: colors.tint }}>Attendance</Text>
-          </Text>
-          <Text style={[s.headerSub, { color: colors.icon }]}>Your trip attendance record</Text>
+          <Text style={[s.headerTitle, { color: colors.text }]}>MY ATTENDANCE</Text>
+          <Text style={[s.headerSub, { color: colors.icon }]}>YOUR TRIP RECORD</Text>
         </View>
 
-        {/* Stats Cards */}
+        {/* Stats Grid (2x2) */}
         <View style={s.statsRow}>
           {[
-            { l: "Total Trips", v: String(total),  color: colors.icon },
-            { l: "Present",     v: String(present), color: "#22c55e" },
-            { l: "Missed",      v: String(missed),  color: "#ef4444" },
-            { l: "Rate",        v: `${pct}%`,       color: pct >= 75 ? "#22c55e" : "#ef4444" },
+            { l: "TOTAL TRIPS", v: String(total),  color: colors.icon },
+            { l: "PRESENT",     v: String(present), color: "#22c55e" },
+            { l: "MISSED",      v: String(missed),  color: "#ef4444" },
+            { l: "RATE",        v: `${pct}%`,       color: pct >= 75 ? "#22c55e" : "#ef4444" },
           ].map(item => (
             <View key={item.l} style={[s.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[s.statLabel, { color: colors.icon }]}>{item.l}</Text>
@@ -157,13 +171,13 @@ export default function AttendancePage() {
           ))}
         </View>
 
-        {/* Progress Bar */}
+        {/* Progress Card */}
         <View style={[s.progressCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={s.progressHeader}>
-            <Text style={[s.progressLabel, { color: colors.icon }]}>Attendance Rate</Text>
+            <Text style={[s.progressLabel, { color: colors.icon }]}>ATTENDANCE RATE</Text>
             <Text style={[s.progressPct, { color: colors.tint }]}>{pct}%</Text>
           </View>
-          <View style={[s.progressTrack, { backgroundColor: colors.border }]}>
+          <View style={[s.progressTrack, { backgroundColor: colors.background }]}>
             <View
               style={[
                 s.progressFill,
@@ -172,115 +186,121 @@ export default function AttendancePage() {
             />
           </View>
           <Text style={[s.progressHint, { color: colors.icon }]}>
-            {pct >= 75 ? "✓ Good attendance keep it up!" : "⚠ Your attendance is below 75%"}
+            {pct >= 75 ? "✓ GOOD ATTENDANCE KEEP IT UP!" : "⚠ YOUR ATTENDANCE IS BELOW 75%"}
           </Text>
         </View>
 
         {/* Trip Log */}
         <View style={[s.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[s.sectionTitle, { color: colors.text }]}>Trip Log</Text>
+          <Text style={[s.sectionTitle, { color: colors.text }]}>TRIP LOG</Text>
 
           {sortedDates.length === 0 ? (
-            <Text style={[s.emptyText, { color: colors.icon }]}>No trip history found</Text>
+            <Text style={[s.emptyText, { color: colors.icon }]}>NO TRIP HISTORY FOUND</Text>
           ) : (
-            sortedDates.map(dateKey => (
-              <View key={dateKey} style={s.dateGroup}>
-                {/* Date Row */}
-                <View style={s.dateRow}>
-                  <Text style={[s.dateText, { color: colors.tint }]}>{dateKey}</Text>
-                  <View style={[s.dateLine, { backgroundColor: colors.border }]} />
-                  <Text style={[s.dateCount, { color: colors.icon }]}>
-                    {groupedByDate[dateKey].filter(b => b.attendanceStatus === "completed").length}/
-                    {groupedByDate[dateKey].length} present
-                  </Text>
-                </View>
+            sortedDates.map(dateKey => {
+              const presentCount = groupedByDate[dateKey].filter(b => b.attendanceStatus === "completed").length;
+              const totalCount = groupedByDate[dateKey].length;
 
-                {/* Booking Rows */}
-                {groupedByDate[dateKey].map(b => {
-                  const { isStarted, isExpired } = checkTripTiming(b);
+              return (
+                <View key={dateKey} style={s.dateGroup}>
+                  {/* Date Row */}
+                  <View style={s.dateRow}>
+                    <Text style={[s.dateText, { color: colors.tint }]}>{dateKey}</Text>
+                    <View style={[s.dateLine, { backgroundColor: colors.border }]} />
+                    <Text style={[s.dateCount, { color: colors.icon }]}>
+                      {presentCount}/{totalCount} PRESENT
+                    </Text>
+                  </View>
 
-                  const dotColor =
-                    b.attendanceStatus === "completed" ? "#22c55e" :
-                    b.attendanceStatus === "missed"    ? "#ef4444" :
-                    colors.tint;
+                  {/* Booking Rows */}
+                  {groupedByDate[dateKey].map(b => {
+                    const { isStarted, isExpired } = checkTripTiming(b);
 
-                  return (
-                    <View key={b._id} style={[s.tripRow, { borderColor: colors.border, backgroundColor: colors.background }]}>
-                      {/* Left Info */}
-                      <View style={s.tripLeft}>
-                        <View style={[s.dot, { backgroundColor: dotColor }]} />
-                        <View>
-                          <Text style={[s.tripName, { color: colors.text }]}>{b.route?.name || "—"}</Text>
-                          <Text style={[s.tripSlot, { color: colors.icon }]}>
-                            {b.timeSlot}{b.specificReturnTime ? ` (${b.specificReturnTime})` : ""}
-                          </Text>
-                        </View>
-                      </View>
+                    const dotColor =
+                      b.attendanceStatus === "completed" ? "#22c55e" :
+                      b.attendanceStatus === "missed"    ? "#ef4444" :
+                      colors.tint;
 
-                      {/* Right Action / Badge */}
-                      {b.status === "assigned" &&
-                       b.attendanceStatus !== "completed" &&
-                       b.attendanceStatus !== "missed" ? (
-                        isExpired ? (
-                          <View style={[s.badge, s.badgeRed]}>
-                            <Text style={[s.badgeText, { color: "#ef4444" }]}>Expired</Text>
+                    return (
+                      <View key={b._id} style={[s.tripRow, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                        {/* Left Info */}
+                        <View style={s.tripLeft}>
+                          <View style={[s.dot, { backgroundColor: dotColor }]} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={[s.tripName, { color: colors.text }]} numberOfLines={1}>
+                              {b.route?.name || "—"}
+                            </Text>
+                            <Text style={[s.tripSlot, { color: colors.icon }]}>
+                              {b.timeSlot}{b.specificReturnTime ? ` (${b.specificReturnTime})` : ""}
+                            </Text>
                           </View>
+                        </View>
+
+                        {/* Right Action / Badge */}
+                        {b.status === "assigned" &&
+                         b.attendanceStatus !== "completed" &&
+                         b.attendanceStatus !== "missed" ? (
+                          isExpired ? (
+                            <View style={[s.badge, s.badgeRed]}>
+                              <Text style={[s.badgeText, { color: "#ef4444" }]}>EXPIRED</Text>
+                            </View>
+                          ) : (
+                            <View style={s.actionRow}>
+                              <TouchableOpacity
+                                disabled={loadingId === b._id || !isStarted}
+                                onPress={() => handleAttendance(b._id, "completed")}
+                                style={[
+                                  s.actionBtn,
+                                  s.btnGreen,
+                                  (loadingId === b._id || !isStarted) && s.btnDisabled,
+                                ]}
+                              >
+                                <Text style={[s.actionBtnText, { color: "#22c55e" }]}>
+                                  {loadingId === b._id ? "..." : "✓ BOARDED"}
+                                </Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                disabled={loadingId === b._id || !isStarted}
+                                onPress={() => handleAttendance(b._id, "missed")}
+                                style={[
+                                  s.actionBtn,
+                                  s.btnRed,
+                                  (loadingId === b._id || !isStarted) && s.btnDisabled,
+                                ]}
+                              >
+                                <Text style={[s.actionBtnText, { color: "#ef4444" }]}>
+                                  {loadingId === b._id ? "..." : "✗ MISSED"}
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                          )
                         ) : (
-                          <View style={s.actionRow}>
-                            <TouchableOpacity
-                              disabled={loadingId === b._id || !isStarted}
-                              onPress={() => handleAttendance(b._id, "completed")}
-                              style={[
-                                s.actionBtn,
-                                s.btnGreen,
-                                (loadingId === b._id || !isStarted) && s.btnDisabled,
-                              ]}
-                            >
-                              <Text style={[s.actionBtnText, { color: "#22c55e" }]}>
-                                {loadingId === b._id ? "..." : "✓ Boarded"}
-                              </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              disabled={loadingId === b._id || !isStarted}
-                              onPress={() => handleAttendance(b._id, "missed")}
-                              style={[
-                                s.actionBtn,
-                                s.btnRed,
-                                (loadingId === b._id || !isStarted) && s.btnDisabled,
-                              ]}
-                            >
-                              <Text style={[s.actionBtnText, { color: "#ef4444" }]}>
-                                {loadingId === b._id ? "..." : "✗ Missed"}
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        )
-                      ) : (
-                        <View style={[
-                          s.badge,
-                          b.attendanceStatus === "completed" ? s.badgeGreen :
-                          b.attendanceStatus === "missed"    ? s.badgeRed   :
-                          s.badgeOrange,
-                        ]}>
-                          <Text style={[
-                            s.badgeText,
-                            { color:
-                              b.attendanceStatus === "completed" ? "#22c55e" :
-                              b.attendanceStatus === "missed"    ? "#ef4444" :
-                              colors.tint
-                            },
+                          <View style={[
+                            s.badge,
+                            b.attendanceStatus === "completed" ? s.badgeGreen :
+                            b.attendanceStatus === "missed"    ? s.badgeRed   :
+                            s.badgeOrange,
                           ]}>
-                            {b.attendanceStatus === "completed" ? "Present" :
-                             b.attendanceStatus === "missed"    ? "Missed"  :
-                             b.status}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  );
-                })}
-              </View>
-            ))
+                            <Text style={[
+                              s.badgeText,
+                              { color:
+                                b.attendanceStatus === "completed" ? "#22c55e" :
+                                b.attendanceStatus === "missed"    ? "#ef4444" :
+                                colors.tint
+                              },
+                            ]}>
+                              {b.attendanceStatus === "completed" ? "PRESENT" :
+                               b.attendanceStatus === "missed"    ? "MISSED"  :
+                               b.status.toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              );
+            })
           )}
         </View>
 
@@ -290,55 +310,56 @@ export default function AttendancePage() {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   root:           { flex: 1 },
   scroll:         { padding: 20, paddingTop: 16 },
   loadWrap:       { flex: 1, justifyContent: "center", alignItems: "center", gap: 12 },
-  loadText:       { fontSize: 13, fontWeight: "700" },
+  loadText:       { fontSize: 11, fontWeight: "900", letterSpacing: 2 },
 
-  header:         { marginBottom: 20 },
-  headerTitle:    { fontSize: 24, fontWeight: "900", textTransform: "uppercase", letterSpacing: -0.5 },
-  headerSub:      { fontSize: 12, fontWeight: "500", marginTop: 4 },
+  header:         { marginBottom: 24 },
+  headerTitle:    { fontSize: 28, fontWeight: "900", textTransform: "uppercase", letterSpacing: -0.5 },
+  headerSub:      { fontSize: 11, fontWeight: "600", marginTop: 4, letterSpacing: 1 },
 
-  statsRow:       { flexDirection: "row", gap: 10, marginBottom: 14 },
-  statCard:       { flex: 1, borderWidth: 1, borderRadius: 18, padding: 14, alignItems: "center" },
-  statLabel:      { fontSize: 9, fontWeight: "700", letterSpacing: 1.5, marginBottom: 6, textTransform: "uppercase" },
-  statValue:      { fontSize: 22, fontWeight: "900" },
+  statsRow:       { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 16 },
+  statCard:       { width: cardWidth, borderWidth: 1, borderRadius: 16, padding: 16 },
+  statLabel:      { fontSize: 9, fontWeight: "900", letterSpacing: 1.5, marginBottom: 8, textTransform: "uppercase" },
+  statValue:      { fontSize: 26, fontWeight: "900" },
 
-  progressCard:   { borderWidth: 1, borderRadius: 24, padding: 20, marginBottom: 14 },
-  progressHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
-  progressLabel:  { fontSize: 10, fontWeight: "800", letterSpacing: 2, textTransform: "uppercase" },
-  progressPct:    { fontSize: 24, fontWeight: "900" },
-  progressTrack:  { height: 12, borderRadius: 99, overflow: "hidden" },
+  progressCard:   { borderWidth: 1, borderRadius: 20, padding: 20, marginBottom: 16 },
+  progressHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+  progressLabel:  { fontSize: 10, fontWeight: "900", letterSpacing: 2, textTransform: "uppercase" },
+  progressPct:    { fontSize: 28, fontWeight: "900" },
+  progressTrack:  { height: 10, borderRadius: 99, overflow: "hidden" },
   progressFill:   { height: "100%", borderRadius: 99 },
-  progressHint:   { marginTop: 10, fontSize: 10, fontWeight: "700" },
+  progressHint:   { marginTop: 12, fontSize: 9, fontWeight: "900", letterSpacing: 1, textTransform: "uppercase" },
 
-  sectionCard:    { borderWidth: 1, borderRadius: 24, padding: 20, marginBottom: 14 },
-  sectionTitle:   { fontSize: 13, fontWeight: "800", letterSpacing: 2, textTransform: "uppercase", marginBottom: 16 },
-  emptyText:      { textAlign: "center", fontSize: 12, fontWeight: "700", paddingVertical: 32, textTransform: "uppercase" },
+  sectionCard:    { borderWidth: 1, borderRadius: 20, padding: 20, marginBottom: 16 },
+  sectionTitle:   { fontSize: 12, fontWeight: "900", letterSpacing: 2, textTransform: "uppercase", marginBottom: 20 },
+  emptyText:      { textAlign: "center", fontSize: 11, fontWeight: "900", paddingVertical: 32, textTransform: "uppercase", letterSpacing: 1.5 },
 
-  dateGroup:      { marginBottom: 20 },
-  dateRow:        { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
-  dateText:       { fontSize: 11, fontWeight: "800", textTransform: "uppercase" },
+  dateGroup:      { marginBottom: 24 },
+  dateRow:        { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
+  dateText:       { fontSize: 10, fontWeight: "900", textTransform: "uppercase", letterSpacing: 1.5 },
   dateLine:       { flex: 1, height: 1 },
-  dateCount:      { fontSize: 9, fontWeight: "700" },
+  dateCount:      { fontSize: 9, fontWeight: "800", textTransform: "uppercase", letterSpacing: 1 },
 
-  tripRow:        { flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 8 },
-  tripLeft:       { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
-  dot:            { width: 8, height: 8, borderRadius: 4 },
-  tripName:       { fontSize: 12, fontWeight: "700" },
-  tripSlot:       { fontSize: 10, fontWeight: "600", textTransform: "uppercase", marginTop: 2 },
+  tripRow:        { flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderWidth: 1, borderRadius: 14, padding: 14, marginBottom: 10 },
+  tripLeft:       { flexDirection: "row", alignItems: "center", gap: 12, flex: 1, paddingRight: 10 },
+  dot:            { width: 10, height: 10, borderRadius: 5 },
+  tripName:       { fontSize: 12, fontWeight: "900", textTransform: "uppercase" },
+  tripSlot:       { fontSize: 9, fontWeight: "700", textTransform: "uppercase", marginTop: 4, letterSpacing: 1 },
 
-  actionRow:      { flexDirection: "row", gap: 8 },
-  actionBtn:      { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
-  actionBtnText:  { fontSize: 10, fontWeight: "900", textTransform: "uppercase" },
-  btnGreen:       { backgroundColor: "rgba(34,197,94,0.1)",  borderColor: "rgba(34,197,94,0.2)" },
-  btnRed:         { backgroundColor: "rgba(239,68,68,0.1)",  borderColor: "rgba(239,68,68,0.2)" },
-  btnDisabled:    { opacity: 0.5 },
+  actionRow:      { flexDirection: "row", gap: 6 },
+  actionBtn:      { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1 },
+  actionBtnText:  { fontSize: 9, fontWeight: "900", textTransform: "uppercase", letterSpacing: 1 },
+  btnGreen:       { backgroundColor: "rgba(34,197,94,0.1)",  borderColor: "rgba(34,197,94,0.3)" },
+  btnRed:         { backgroundColor: "rgba(239,68,68,0.1)",  borderColor: "rgba(239,68,68,0.3)" },
+  btnDisabled:    { opacity: 0.4 },
 
-  badge:          { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
-  badgeText:      { fontSize: 10, fontWeight: "800", textTransform: "uppercase" },
-  badgeGreen:     { backgroundColor: "rgba(34,197,94,0.1)",  borderColor: "rgba(34,197,94,0.2)" },
-  badgeRed:       { backgroundColor: "rgba(239,68,68,0.1)",  borderColor: "rgba(239,68,68,0.2)" },
-  badgeOrange:    { backgroundColor: "rgba(247,160,27,0.1)", borderColor: "rgba(247,160,27,0.2)" },
+  badge:          { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
+  badgeText:      { fontSize: 9, fontWeight: "900", textTransform: "uppercase", letterSpacing: 1 },
+  badgeGreen:     { backgroundColor: "rgba(34,197,94,0.1)",  borderColor: "rgba(34,197,94,0.3)" },
+  badgeRed:       { backgroundColor: "rgba(239,68,68,0.1)",  borderColor: "rgba(239,68,68,0.3)" },
+  badgeOrange:    { backgroundColor: "rgba(247,160,27,0.1)", borderColor: "rgba(247,160,27,0.3)" },
 });

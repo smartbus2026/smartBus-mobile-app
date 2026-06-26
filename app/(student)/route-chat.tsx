@@ -4,10 +4,13 @@ import {
   FlatList, StyleSheet, ActivityIndicator,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { MapPin, Send, Clock, Loader } from 'lucide-react-native';
+import { MapPin, Send, Clock } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
 import socket from '../../src/services/socket';
 import Api from '../../src/services/api';
 import { useThemeColor } from '../../constants/theme';
+import TopBar from '../../src/components/TopBar';
 
 interface Message {
   _id: string;
@@ -22,19 +25,33 @@ interface Message {
 
 export default function GroupChat() {
   const colors = useThemeColor();
+  const router = useRouter();
 
-  const [isOpen, setIsOpen]           = useState(false);
+  const [isOpen, setIsOpen]             = useState(false);
   const [messageLabel, setMessageLabel] = useState('Loading chat status...');
-  const [roomId, setRoomId]           = useState('');
-  const [routeName, setRouteName]     = useState('');
-  const [timeSlot, setTimeSlot]       = useState('');
+  const [roomId, setRoomId]             = useState('');
+  const [routeName, setRouteName]       = useState('');
+  const [timeSlot, setTimeSlot]         = useState('');
 
-  const [messages, setMessages]       = useState<Message[]>([]);
-  const [newMessage, setNewMessage]   = useState('');
-  const [isLoading, setIsLoading]     = useState(true);
+  const [messages, setMessages]         = useState<Message[]>([]);
+  const [newMessage, setNewMessage]     = useState('');
+  const [isLoading, setIsLoading]       = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string>('');
 
-  const flatListRef   = useRef<FlatList>(null);
-  const currentUserId = ''; // replace with AsyncStorage / AuthContext
+  const flatListRef = useRef<FlatList>(null);
+
+  // Fetch current user ID to differentiate "my messages" from others
+  useEffect(() => {
+    const fetchUserId = async () => {
+      try {
+        const id = await AsyncStorage.getItem('userId');
+        if (id) setCurrentUserId(id);
+      } catch (e) {
+        console.error('Failed to get user ID', e);
+      }
+    };
+    fetchUserId();
+  }, []);
 
   useEffect(() => {
     const fetchChatStatus = async () => {
@@ -64,7 +81,7 @@ export default function GroupChat() {
     return () => {
       if (roomId) socket.emit('leaveRoom', roomId);
     };
-  }, []);
+  }, [roomId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -81,7 +98,7 @@ export default function GroupChat() {
   const handleSend = async () => {
     if (!newMessage.trim() || !roomId) return;
     const text = newMessage;
-    setNewMessage('');
+    setNewMessage(''); // Optimistic clear
     try {
       await Api.post(`/chat/${roomId}`, { message: text });
     } catch (err) {
@@ -115,95 +132,98 @@ export default function GroupChat() {
     );
   };
 
-  // ── Loading ──────────────────────────────────────────────────────────────
-  if (isLoading) {
-    return (
-      <View style={[s.centerWrap, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.tint} />
-      </View>
-    );
-  }
-
-  // ── Chat Closed ──────────────────────────────────────────────────────────
-  if (!isOpen) {
-    return (
-      <View style={[s.centerWrap, { backgroundColor: colors.background }]}>
-        <View style={[s.closedCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Clock size={40} color={colors.icon} style={{ opacity: 0.5, marginBottom: 16 }} />
-          <Text style={[s.closedTitle, { color: colors.text }]}>Chat Window Closed</Text>
-          <Text style={[s.closedSub,   { color: colors.icon }]}>{messageLabel}</Text>
-        </View>
-      </View>
-    );
-  }
-
-  // ── Chat Open ────────────────────────────────────────────────────────────
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
+      
+      {/* TopBar is always visible */}
+      <TopBar
+        title="Live Chat"
+        showMenu={true}
+        showSettings={true}
+      />
 
-      {/* Header */}
-      <View style={[s.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <View>
-          <Text style={[s.headerTitle, { color: colors.text }]}>Route Group Chat</Text>
-          <View style={s.headerMeta}>
-            <MapPin size={10} color={colors.tint} />
-            <Text style={[s.headerMetaText, { color: colors.icon }]}>{routeName}</Text>
-            <Text style={[s.headerMetaText, { color: colors.icon }]}>•</Text>
-            <Text style={[s.headerMetaText, { color: colors.icon }]}>{timeSlot} Wave</Text>
+      {/* ── Loading ────────────────────────────────────────────────────────────── */}
+      {isLoading ? (
+        <View style={s.centerWrap}>
+          <ActivityIndicator size="large" color={colors.tint} />
+        </View>
+      ) : 
+
+      /* ── Chat Closed ────────────────────────────────────────────────────────── */
+      !isOpen ? (
+        <View style={s.centerWrap}>
+          <View style={[s.closedCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Clock size={40} color={colors.icon} style={{ opacity: 0.5, marginBottom: 16 }} />
+            <Text style={[s.closedTitle, { color: colors.text }]}>Chat Window Closed</Text>
+            <Text style={[s.closedSub,   { color: colors.icon }]}>{messageLabel}</Text>
           </View>
         </View>
-        <View style={s.liveBadge}>
-          <View style={s.liveDot} />
-          <Text style={s.liveText}>Live</Text>
-        </View>
-      </View>
+      ) : 
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-      >
-        {/* Messages */}
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(item, i) => item._id || String(i)}
-          renderItem={renderMessage}
-          contentContainerStyle={s.messagesList}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
-          ListEmptyComponent={
-            <View style={s.emptyWrap}>
-              <Send size={24} color={colors.icon} style={{ opacity: 0.4, marginBottom: 8 }} />
-              <Text style={[s.emptyTitle, { color: colors.text }]}>No messages yet</Text>
-              <Text style={[s.emptySub,   { color: colors.icon }]}>Be the first to say hello!</Text>
+      /* ── Chat Open ──────────────────────────────────────────────────────────── */
+      (
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          {/* Sub Header for Route Details */}
+          <View style={[s.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+            <View>
+              <Text style={[s.headerTitle, { color: colors.text }]}>Route Group Chat</Text>
+              <View style={s.headerMeta}>
+                <MapPin size={10} color={colors.tint} />
+                <Text style={[s.headerMetaText, { color: colors.icon }]}>{routeName}</Text>
+                <Text style={[s.headerMetaText, { color: colors.icon }]}>•</Text>
+                <Text style={[s.headerMetaText, { color: colors.icon }]}>{timeSlot} Wave</Text>
+              </View>
             </View>
-          }
-        />
+            <View style={s.liveBadge}>
+              <View style={s.liveDot} />
+              <Text style={s.liveText}>Live</Text>
+            </View>
+          </View>
 
-        {/* Input */}
-        <View style={[s.inputBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
-          <TextInput
-            style={[s.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
-            placeholder="Type your message..."
-            placeholderTextColor={colors.icon}
-            value={newMessage}
-            onChangeText={setNewMessage}
-            onSubmitEditing={handleSend}
-            returnKeyType="send"
-            multiline
+          {/* Messages */}
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            keyExtractor={(item, i) => item._id || String(i)}
+            renderItem={renderMessage}
+            contentContainerStyle={s.messagesList}
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+            ListEmptyComponent={
+              <View style={s.emptyWrap}>
+                <Send size={24} color={colors.icon} style={{ opacity: 0.4, marginBottom: 8 }} />
+                <Text style={[s.emptyTitle, { color: colors.text }]}>No messages yet</Text>
+                <Text style={[s.emptySub,   { color: colors.icon }]}>Be the first to say hello!</Text>
+              </View>
+            }
           />
-          <TouchableOpacity
-            style={[s.sendBtn, { backgroundColor: colors.tint }, !newMessage.trim() && s.sendDisabled]}
-            onPress={handleSend}
-            disabled={!newMessage.trim()}
-            activeOpacity={0.85}
-          >
-            <Send size={14} color="#000" />
-            <Text style={s.sendLabel}>Send</Text>
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
 
+          {/* Input */}
+          <View style={[s.inputBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+            <TextInput
+              style={[s.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+              placeholder="Type your message..."
+              placeholderTextColor={colors.icon}
+              value={newMessage}
+              onChangeText={setNewMessage}
+              onSubmitEditing={handleSend}
+              returnKeyType="send"
+              multiline
+            />
+            <TouchableOpacity
+              style={[s.sendBtn, { backgroundColor: colors.tint }, !newMessage.trim() && s.sendDisabled]}
+              onPress={handleSend}
+              disabled={!newMessage.trim()}
+              activeOpacity={0.85}
+            >
+              <Send size={14} color="#000" />
+              <Text style={s.sendLabel}>Send</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      )}
     </View>
   );
 }
@@ -241,7 +261,7 @@ const s = StyleSheet.create({
   emptyTitle:    { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2 },
   emptySub:      { fontSize: 10, marginTop: 4 },
 
-  inputBar:      { flexDirection: 'row', alignItems: 'flex-end', gap: 10, padding: 12, borderTopWidth: 1 },
+  inputBar:      { flexDirection: 'row', alignItems: 'flex-end', gap: 10, padding: 12, borderTopWidth: 1, paddingBottom: Platform.OS === 'ios' ? 24 : 12 },
   input:         { flex: 1, borderWidth: 1, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, maxHeight: 100 },
   sendBtn:       { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 20, height: 48, borderRadius: 16, justifyContent: 'center' },
   sendDisabled:  { opacity: 0.4 },
