@@ -1,53 +1,44 @@
+// src/components/Sidebar.tsx
 import { usePathname, useRouter } from 'expo-router';
 import {
-  BarChart2, Bell,
-  Bus,
-  Calendar,
-  HelpCircle,
-  LayoutGrid,
-  LogOut,
-  Map,
-  MessageCircle, Plus,
-  Route,
-  Settings,
-  Target,
-  Users
+  BarChart2, Bell, Bus, Calendar, HelpCircle,
+  LayoutGrid, LogOut, Map, MessageCircle,
+  Navigation, Plus, Route, Settings, Target, Users,
 } from 'lucide-react-native';
 import React from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text, TouchableOpacity,
-  View
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useThemeColor } from '../../constants/theme';
 import { useAuth } from '../context/AuthContext';
 import { useSidebar } from '../context/SidebarContext2';
 
-// ─── Nav lists (mirrors the web Sidebar) ────────────────────────────────────
-
 const STUDENT_NAV = [
-  { id: 'dashboard',     path: '/(student)/dashboard',      label: 'Dashboard',      Icon: LayoutGrid },
-  { id: 'book-trip',     path: '/(student)/book-trip',      label: 'Book Trip',      Icon: Calendar },
-  { id: 'my-trips',      path: '/(student)/my-trips',       label: 'My Trips',       Icon: Route },
-  { id: 'route-details', path: '/(student)/route-details',  label: 'Route Details',  Icon: Map },
-  { id: 'track-bus',     path: '/(student)/track-bus',      label: 'Track Bus',      Icon: Target },
-  { id: 'attendance',    path: '/(student)/attendance',     label: 'Attendance',     Icon: BarChart2 },
-  { id: 'notifications', path: '/(student)/notifications',  label: 'Notifications',  Icon: Bell },
-  { id: 'route-chat',    path: '/(student)/route-chat',     label: 'Live Chat',      Icon: MessageCircle },
+  { id: 'dashboard',     path: '/(student)/dashboard',     label: 'Dashboard',     Icon: LayoutGrid },
+  { id: 'book-trip',     path: '/(student)/book-trip',     label: 'Book Trip',     Icon: Calendar },
+  { id: 'my-trips',      path: '/(student)/my-trips',      label: 'My Trips',      Icon: Route },
+  { id: 'route-details', path: '/(student)/route-details', label: 'Route Details', Icon: Map },
+  { id: 'track-bus',     path: '/(student)/track-bus',     label: 'Track Bus',     Icon: Target },
+  { id: 'attendance',    path: '/(student)/attendance',    label: 'Attendance',    Icon: BarChart2 },
+  { id: 'notifications', path: '/(student)/notifications', label: 'Notifications', Icon: Bell },
+  { id: 'route-chat',    path: '/(student)/route-chat',    label: 'Live Chat',     Icon: MessageCircle },
 ];
 
 const ADMIN_NAV = [
-  { id: 'dashboard',     path: '/(admin)/dashboard',        label: 'Dashboard',      Icon: LayoutGrid },
-  { id: 'create-trip',   path: '/(admin)/create-trip',      label: 'Create Trip',    Icon: Plus },
-  { id: 'users',         path: '/(admin)/users',            label: 'Users',          Icon: Users },
-  { id: 'routes',        path: '/(admin)/routes',           label: 'Manage Routes',  Icon: Route },
-  { id: 'trips',         path: '/(admin)/trips',            label: 'Manage Trips',   Icon: Calendar },
-  { id: 'live-tracking', path: '/(admin)/live-tracking',    label: 'Live Tracking',  Icon: Target },
-  { id: 'notifications', path: '/(admin)/notifications',    label: 'Notifications',  Icon: Bell },
-  { id: 'support',       path: '/(admin)/support',          label: 'Support Inbox',  Icon: MessageCircle },
+  { id: 'dashboard',     path: '/(admin)/dashboard',       label: 'Dashboard',     Icon: LayoutGrid },
+  { id: 'create-trip',   path: '/(admin)/create-trip',     label: 'Create Trip',   Icon: Plus },
+  { id: 'users',         path: '/(admin)/users',           label: 'Users',         Icon: Users },
+  { id: 'routes',        path: '/(admin)/routes',          label: 'Manage Routes', Icon: Route },
+  { id: 'trips',         path: '/(admin)/trips',           label: 'Manage Trips',  Icon: Calendar },
+  { id: 'live-tracking', path: '/(admin)/live-tracking',   label: 'Live Tracking', Icon: Target },
+  { id: 'notifications', path: '/(admin)/notifications',   label: 'Notifications', Icon: Bell },
+  { id: 'support',       path: '/(admin)/support',         label: 'Support Inbox', Icon: MessageCircle },
+];
+
+const DRIVER_NAV = [
+  { id: 'dashboard',     path: '/(driver)/dashboard',      label: 'Dashboard',     Icon: LayoutGrid },
+  { id: 'my-trips',      path: '/(driver)/my-trips',       label: 'My Trips',      Icon: Route },
+  { id: 'live-tracking', path: '/(driver)/live-tracking',  label: 'Live Tracking', Icon: Navigation },
+  { id: 'history',       path: '/(driver)/history',        label: 'History',       Icon: BarChart2 },
 ];
 
 const STUDENT_BOTTOM = [
@@ -60,7 +51,9 @@ const ADMIN_BOTTOM = [
   { id: 'settings', path: '/(admin)/settings', label: 'Settings',       Icon: Settings },
 ];
 
-// ─── Single nav item ─────────────────────────────────────────────────────────
+const DRIVER_BOTTOM = [
+  { id: 'settings', path: '/(driver)/settings', label: 'Profile Settings', Icon: Settings },
+];
 
 function NavItem({
   item, colors, onPress, active,
@@ -73,19 +66,11 @@ function NavItem({
   const { Icon } = item;
   return (
     <TouchableOpacity
-      style={[
-        s.navItem,
-        active
-          ? { backgroundColor: `${colors.tint}1A` }
-          : { backgroundColor: 'transparent' },
-      ]}
+      style={[s.navItem, { backgroundColor: active ? `${colors.tint}1A` : 'transparent' }]}
       onPress={onPress}
       activeOpacity={0.75}
     >
-      {/* left accent bar */}
-      {active && (
-        <View style={[s.accentBar, { backgroundColor: colors.tint }]} />
-      )}
+      {active && <View style={[s.accentBar, { backgroundColor: colors.tint }]} />}
       <Icon size={18} color={active ? colors.tint : colors.icon} strokeWidth={active ? 2.5 : 2} />
       <Text style={[s.navLabel, { color: active ? colors.tint : colors.icon }, active && s.navLabelActive]}>
         {item.label}
@@ -94,10 +79,8 @@ function NavItem({
   );
 }
 
-// ─── Sidebar ─────────────────────────────────────────────────────────────────
-
 interface SidebarProps {
-  role: 'student' | 'admin' | null;
+  role: 'student' | 'admin' | 'driver' | null;
 }
 
 export default function Sidebar({ role }: SidebarProps) {
@@ -107,8 +90,8 @@ export default function Sidebar({ role }: SidebarProps) {
   const { isOpen, closeSidebar } = useSidebar();
   const { logout } = useAuth();
 
-  const NAV        = role === 'admin' ? ADMIN_NAV    : STUDENT_NAV;
-  const BOTTOM_NAV = role === 'admin' ? ADMIN_BOTTOM : STUDENT_BOTTOM;
+  const NAV        = role === 'admin' ? ADMIN_NAV    : role === 'driver' ? DRIVER_NAV    : STUDENT_NAV;
+  const BOTTOM_NAV = role === 'admin' ? ADMIN_BOTTOM : role === 'driver' ? DRIVER_BOTTOM : STUDENT_BOTTOM;
 
   const isActive = (id: string) => pathname.includes(id);
 
@@ -127,19 +110,12 @@ export default function Sidebar({ role }: SidebarProps) {
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      <Pressable style={s.backdrop} onPress={closeSidebar} />
 
-      {/* ── Backdrop ── */}
-      <Pressable
-        style={[s.backdrop]}
-        onPress={closeSidebar}
-      />
-
-      {/* ── Drawer ── */}
       <SafeAreaView
         edges={['top', 'bottom']}
         style={[s.drawer, { backgroundColor: colors.card, borderRightColor: colors.border }]}
       >
-
         {/* Logo */}
         <View style={[s.logoRow, { borderBottomColor: colors.border }]}>
           <View style={[s.logoIcon, { backgroundColor: colors.tint, shadowColor: colors.tint }]}>
@@ -148,17 +124,16 @@ export default function Sidebar({ role }: SidebarProps) {
           <Text style={[s.logoText, { color: colors.text }]}>
             Smart<Text style={{ color: colors.tint }}>Bus</Text>
             {role === 'admin' && (
-              <Text style={[s.adminBadge, { color: colors.tint }]}> ADMIN</Text>
+              <Text style={[s.roleBadge, { color: colors.tint }]}> ADMIN</Text>
+            )}
+            {role === 'driver' && (
+              <Text style={[s.roleBadge, { color: colors.tint }]}> DRIVER</Text>
             )}
           </Text>
         </View>
 
         {/* Main Nav */}
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={s.navScroll}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={s.navScroll} showsVerticalScrollIndicator={false}>
           {NAV.map(item => (
             <NavItem
               key={item.id}
@@ -181,22 +156,15 @@ export default function Sidebar({ role }: SidebarProps) {
               onPress={() => navigate(item.path)}
             />
           ))}
-
-          {/* Logout */}
           <TouchableOpacity style={s.logoutBtn} onPress={handleLogout} activeOpacity={0.75}>
             <LogOut size={18} color="#ef4444" />
             <Text style={s.logoutTxt}>Sign Out</Text>
           </TouchableOpacity>
         </View>
-
       </SafeAreaView>
     </View>
   );
 }
-
-// ─── Styles ──────────────────────────────────────────────────────────────────
-
-const DRAWER_WIDTH = 272;
 
 const s = StyleSheet.create({
   backdrop: {
@@ -205,10 +173,8 @@ const s = StyleSheet.create({
   },
   drawer: {
     position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    width: DRAWER_WIDTH,
+    top: 0, bottom: 0, left: 0,
+    width: 272,
     borderRightWidth: 1,
     shadowColor: '#000',
     shadowOffset: { width: 4, height: 0 },
@@ -216,8 +182,6 @@ const s = StyleSheet.create({
     shadowRadius: 20,
     elevation: 20,
   },
-
-  // Logo
   logoRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -227,84 +191,48 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
   },
   logoIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 36, height: 36, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.25, shadowRadius: 8, elevation: 6,
   },
   logoText: {
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: -0.5,
-    textTransform: 'uppercase',
+    fontSize: 18, fontWeight: '900',
+    letterSpacing: -0.5, textTransform: 'uppercase',
   },
-  adminBadge: {
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 1,
+  roleBadge: {
+    fontSize: 8, fontWeight: '900', letterSpacing: 1,
   },
-
-  // Nav
   navScroll: {
-    paddingHorizontal: 12,
-    paddingTop: 20,
-    paddingBottom: 8,
-    gap: 4,
+    paddingHorizontal: 12, paddingTop: 20, paddingBottom: 8, gap: 4,
   },
   navItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    borderRadius: 16,
-    marginBottom: 2,
-    position: 'relative',
-    overflow: 'hidden',
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 14, paddingVertical: 13,
+    borderRadius: 16, marginBottom: 2,
+    position: 'relative', overflow: 'hidden',
   },
   accentBar: {
-    position: 'absolute',
-    left: 0,
-    width: 3,
-    height: 20,
-    borderRadius: 2,
+    position: 'absolute', left: 0,
+    width: 3, height: 20, borderRadius: 2,
   },
   navLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.2,
+    fontSize: 13, fontWeight: '700', letterSpacing: 0.2,
   },
   navLabelActive: {
     fontWeight: '800',
   },
-
-  // Bottom
   bottomSection: {
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 8,
-    borderTopWidth: 1,
-    gap: 2,
+    paddingHorizontal: 12, paddingTop: 12,
+    paddingBottom: 8, borderTopWidth: 1, gap: 2,
   },
   logoutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    borderRadius: 16,
-    marginTop: 4,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 14, paddingVertical: 14,
+    borderRadius: 16, marginTop: 4,
   },
   logoutTxt: {
-    fontSize: 11,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-    color: '#ef4444',
+    fontSize: 11, fontWeight: '900',
+    textTransform: 'uppercase', letterSpacing: 2, color: '#ef4444',
   },
 });

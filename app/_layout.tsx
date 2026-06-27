@@ -1,9 +1,9 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { ThemeProvider } from '../src/context/ThemeContext';
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 function RootGuard() {
   const { token, userRole, isLoading } = useAuth();
@@ -25,7 +25,9 @@ function RootGuard() {
         }
       } else if (token && inAuth) {
         router.replace(
-          userRole === 'admin' ? '/(admin)/dashboard' : '/(student)/dashboard'
+          userRole === 'admin'  ? '/(admin)/dashboard'  :
+          userRole === 'driver' ? '/(driver)/dashboard' :
+          '/(student)/dashboard'
         );
       }
     };
@@ -46,6 +48,7 @@ function RootGuard() {
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(student)" />
       <Stack.Screen name="(admin)" />
+      <Stack.Screen name="(driver)" />
     </Stack>
   );
 }
