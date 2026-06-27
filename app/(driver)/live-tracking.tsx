@@ -8,7 +8,7 @@ import { useRouter } from 'expo-router';
 import {
   Navigation, MapPin, Bus, Signal, AlertTriangle,
 } from 'lucide-react-native';
-import { useDriverContext } from './_layout';
+import { useDriverContext } from '../../src/context/DriverContext';
 import { useThemeColor } from '../../constants/theme';
 import TopBar from '../../src/components/TopBar';
 

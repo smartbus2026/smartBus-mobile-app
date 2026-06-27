@@ -8,7 +8,7 @@ import {
   Bus, Clock, Calendar, Users, Route,
   CheckCircle, X, Play, Square,
 } from 'lucide-react-native';
-import { useDriverContext, DriverTrip } from './_layout';
+import { useDriverContext, DriverTrip } from '../../src/context/DriverContext';
 import { useThemeColor } from '../../constants/theme';
 import TopBar from '../../src/components/TopBar';
 

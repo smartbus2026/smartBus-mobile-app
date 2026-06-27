@@ -9,7 +9,7 @@ import {
   CheckCircle, X, Navigation, MapPin,
   Shield, Play, Square,
 } from 'lucide-react-native';
-import { useDriverContext, DriverTrip } from './_layout';
+import { useDriverContext, DriverTrip } from '../../src/context/DriverContext';
 import { useThemeColor } from '../../constants/theme';
 import TopBar from '../../src/components/TopBar';
 

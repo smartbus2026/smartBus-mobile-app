@@ -12,6 +12,7 @@ import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/dat
 import { useThemeColor } from '../../constants/theme';
 import TopBar from '../../src/components/TopBar';
 import Api from '../../src/services/api';
+import { useDriverContext, DriverTrip } from '../../src/context/DriverContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface TripRecord {
