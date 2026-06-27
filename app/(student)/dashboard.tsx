@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, ActivityIndicator, RefreshControl,
+  StyleSheet, ActivityIndicator, RefreshControl, Dimensions
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -14,11 +14,8 @@ import { useAuth } from '../../src/context/AuthContext';
 import { useThemeColor } from '../../constants/theme';
 import TopBar from '../../src/components/TopBar';
 
-const SLOT_MAP: Record<string, string> = {
-  morning:     'Morning',
-  return_1530: '3:30 PM',
-  return_1900: '7:00 PM',
-};
+const { width } = Dimensions.get('window');
+const cardWidth = (width - 40 - 12) / 2; // 40 for padding, 12 for gap
 
 const StatCard = ({
   label, value, icon, color, bg, colors,
@@ -28,7 +25,7 @@ const StatCard = ({
 }) => (
   <View style={[s.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
     <View style={s.statCardTop}>
-      <Text style={[s.statLabel, { color: colors.icon }]}>{label}</Text>
+      <Text style={[s.statLabel, { color: colors.icon }]} numberOfLines={1}>{label}</Text>
       <View style={[s.statIconWrap, { backgroundColor: bg }]}>
         {icon}
       </View>
@@ -89,33 +86,40 @@ export default function DashboardScreen() {
 
   const stats = [
     { label: 'Total Demands', value: String(bookings.length),                                                                          icon: <Route size={16} color="#f7a01b" />,   color: colors.tint,  bg: `${colors.tint}1A` },
-    { label: 'Assigned',      value: String(bookings.filter(b => b.status === 'assigned' || b.status === 'active').length),            icon: <CheckCircle size={16} color="#22c55e" />, color: '#22c55e', bg: 'rgba(34,197,94,0.1)' },
+    { label: 'Assigned',      value: String(bookings.filter(b => b.status === 'assigned' || b.status === 'active' || b.status === 'in-progress' || b.status === 'in_progress').length), icon: <CheckCircle size={16} color="#22c55e" />, color: '#22c55e', bg: 'rgba(34,197,94,0.1)' },
     { label: 'Pending',       value: String(bookings.filter(b => b.status === 'pending').length),                                      icon: <Calendar size={16} color="#60a5fa" />,    color: '#60a5fa', bg: 'rgba(96,165,250,0.1)' },
     { label: 'Cancelled',     value: String(bookings.filter(b => b.status === 'cancelled').length),                                    icon: <X size={16} color="#ef4444" />,           color: '#ef4444', bg: 'rgba(239,68,68,0.1)' },
   ];
 
   const quickActions = [
-    { label: 'Book Trip',     Icon: Bus,         route: '/(student)/book-trip' },
-    { label: 'My Trips',      Icon: Calendar,    route: '/(student)/my-trips' },
-    { label: 'Attendance',    Icon: CheckCircle, route: '/(student)/attendance' },
-    { label: 'Notifications', Icon: Bell,        route: '/(student)/notifications' },
+    { label: 'Book New Trip', Icon: Bus,         route: '/(student)/book-trip',    color: colors.tint,  bg: `${colors.tint}1A` },
+    { label: 'Route Details', Icon: MapPin,      route: '/(student)/route-details',color: '#22c55e', bg: 'rgba(34,197,94,0.1)' },
+    { label: 'My Trips',      Icon: Calendar,    route: '/(student)/my-trips',     color: '#60a5fa', bg: 'rgba(96,165,250,0.1)' },
+    { label: 'Notifications', Icon: Bell,        route: '/(student)/notifications',color: '#ef4444', bg: 'rgba(239,68,68,0.1)' },
   ];
 
   const getStatusColor = (status: string) => {
-    if (status === 'active' || status === 'assigned')
+    if (status === 'active' || status === 'assigned' || status === 'in_progress')
       return { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  text: '#22c55e' };
     if (status === 'pending')
       return { bg: 'rgba(96,165,250,0.1)', border: 'rgba(96,165,250,0.2)', text: '#60a5fa' };
-    if (status === 'cancelled')
+    if (status === 'cancelled' || status === 'missed')
       return { bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.2)',  text: '#ef4444' };
     return   { bg: 'rgba(247,160,27,0.1)', border: 'rgba(247,160,27,0.2)', text: colors.tint };
+  };
+
+  const formatTimeSlot = (trip: any) => {
+    if (trip.timeSlot === 'Return' && trip.specificReturnTime) {
+      return `${trip.specificReturnTime} (Return)`;
+    }
+    return trip.timeSlot || 'TBA';
   };
 
   if (isLoading) {
     return (
       <View style={[s.center, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.tint} />
-        <Text style={[s.loadingTxt, { color: colors.icon }]}>Loading Dashboard...</Text>
+        <Text style={[s.loadingTxt, { color: colors.icon }]}>LOADING DASHBOARD...</Text>
       </View>
     );
   }
@@ -124,7 +128,7 @@ export default function DashboardScreen() {
     <View style={[s.root, { backgroundColor: colors.background }]}>
 
       <TopBar
-        title="Dashboard"
+        title="My Dashboard"
         showMenu
         showSettings
         onSettingsPress={() => router.push('/(student)/settings' as any)}
@@ -137,12 +141,12 @@ export default function DashboardScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.tint} />}
       >
 
-        {/* Welcome */}
+        {/* Welcome Section */}
         <View style={s.welcome}>
           <View>
             <Text style={[s.welcomeSub, { color: colors.icon }]}>STUDENT PORTAL</Text>
             <Text style={[s.welcomeName, { color: colors.text }]}>
-              Hey, <Text style={{ color: colors.tint }}>{user.name.split(' ')[0]}</Text> 👋
+              Hey, <Text style={{ color: colors.tint }}>{user.name.split(' ')[0]}</Text>
             </Text>
           </View>
           <View style={[s.avatarCircle, { backgroundColor: `${colors.tint}1A`, borderColor: `${colors.tint}4D` }]}>
@@ -150,7 +154,7 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* Stats */}
+        {/* Stats Grid (2x2) */}
         <View style={s.statsRow}>
           {stats.map(st => <StatCard key={st.label} {...st} colors={colors} />)}
         </View>
@@ -160,99 +164,68 @@ export default function DashboardScreen() {
           activeTrips.map(trip => {
             const sc = getStatusColor(trip.status);
             return (
-              <View key={trip._id} style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={s.cardHeaderRow}>
+              <View key={trip._id} style={[s.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 0, overflow: 'hidden' }]}>
+                {/* Header */}
+                <View style={[s.cardHeaderRow, { backgroundColor: `${colors.tint}0A`, borderBottomWidth: 1, borderBottomColor: colors.border, padding: 16, marginBottom: 0 }]}>
                   <View style={[s.statusBadge, { backgroundColor: sc.bg, borderColor: sc.border }]}>
                     <Text style={[s.statusTxt, { color: sc.text }]}>{trip.status?.toUpperCase()}</Text>
                   </View>
                   <Text style={[s.cardTitle, { color: colors.text }]} numberOfLines={1}>
-                    {trip.route?.name || 'Selected Route'}
+                    {trip.route?.name || 'SELECTED ROUTE'}
                   </Text>
                 </View>
 
-                <View style={s.detailsGrid}>
-                  <DetailItem label="Date"      value={trip.date ? new Date(trip.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : 'TBA'} colors={colors} />
-                  <DetailItem label="Time Slot" value={(trip.timeSlot === 'Return' && trip.specificReturnTime) ? `${trip.specificReturnTime} (Return)` : (trip.timeSlot || 'TBA')} highlight colors={colors} />
-                  <DetailItem label="Status"    value={trip.status || 'pending'} colors={colors} />
-                  <DetailItem label="Route"     value={trip.route?.name || 'TBA'} colors={colors} />
+                {/* Body */}
+                <View style={[s.detailsGrid, { padding: 16, marginBottom: 0 }]}>
+                  <DetailItem label="Date" value={trip.date ? new Date(trip.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : 'TBA'} colors={colors} />
+                  <DetailItem label="Time Slot" value={formatTimeSlot(trip)} highlight colors={colors} />
+                  <DetailItem label="Status" value={trip.status || 'pending'} colors={colors} />
+                  <DetailItem label="Route" value={trip.route?.name || 'TBA'} colors={colors} />
                 </View>
 
+                {/* Track Button */}
                 {trip.status === 'assigned' && (
-                  <TouchableOpacity
-                    style={[s.trackBtn, { borderColor: colors.border }]}
-                    onPress={() => router.push('/(student)/track-bus')}
-                  >
-                    <MapPin size={14} color={colors.icon} />
-                    <Text style={[s.trackTxt, { color: colors.icon }]}>Track Live</Text>
-                    <ArrowRight size={14} color={colors.icon} />
-                  </TouchableOpacity>
+                  <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+                    <TouchableOpacity
+                      style={[s.trackBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
+                      onPress={() => router.push('/(student)/track-bus')}
+                    >
+                      <MapPin size={12} color={colors.icon} />
+                      <Text style={[s.trackTxt, { color: colors.icon }]}>TRACK LIVE</Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
               </View>
             );
           })
         ) : (
           <View style={[s.card, s.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Bus size={40} color={colors.tint} style={{ marginBottom: 12 }} />
-            <Text style={[s.emptyTitle, { color: colors.text }]}>No Active Trips</Text>
+            <View style={[s.emptyIconWrap, { backgroundColor: colors.background }]}>
+              <Bus size={28} color={colors.icon} style={{ opacity: 0.6 }} />
+            </View>
+            <Text style={[s.emptyTitle, { color: colors.text }]}>NO ACTIVE TRIPS</Text>
             <Text style={[s.emptyDesc, { color: colors.icon }]}>
               You don't have any active trips for today. Book a seat to see it here.
             </Text>
-            <TouchableOpacity
-              style={[s.bookBtn, { backgroundColor: colors.tint }]}
-              onPress={() => router.push('/(student)/book-trip')}
-            >
-              <Text style={s.bookBtnTxt}>+ Book a Trip</Text>
-            </TouchableOpacity>
           </View>
         )}
 
-        {/* Recent Bookings */}
+        {/* Quick Actions (List style like Web) */}
         <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={s.cardHeaderRow}>
-            <Text style={[s.sectionTitle, { color: colors.text }]}>Recent Bookings</Text>
-            <TouchableOpacity onPress={() => router.push('/(student)/my-trips')}>
-              <Text style={[s.viewAll, { color: colors.tint }]}>View All →</Text>
-            </TouchableOpacity>
+          <View style={s.sectionHeader}>
+            <Text style={[s.sectionTitle, { color: colors.icon }]}>QUICK ACTIONS</Text>
           </View>
-
-          {bookings.length === 0 ? (
-            <Text style={[s.emptyDesc, { color: colors.icon }]}>No bookings yet</Text>
-          ) : (
-            bookings.slice(0, 4).map(b => {
-              const sc = getStatusColor(b.status);
-              return (
-                <View key={b._id} style={[s.bookingRow, { borderBottomColor: colors.border }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[s.bookingRoute, { color: colors.text }]}>{b.route?.name || 'Unknown Route'}</Text>
-                    <Text style={[s.bookingMeta, { color: colors.icon }]}>
-                      {(b.timeSlot === 'Return' && b.specificReturnTime) ? `${b.specificReturnTime} (Return)` : b.timeSlot}
-                      {b.date ? ` · ${new Date(b.date).toLocaleDateString('en-GB')}` : ''}
-                    </Text>
-                  </View>
-                  <View style={s.bookingRight}>
-                    <Text style={[s.bookingSeat, { color: colors.text }]}>—</Text>
-                    <View style={[s.statusBadge, { backgroundColor: sc.bg, borderColor: sc.border }]}>
-                      <Text style={[s.statusTxt, { color: sc.text }]}>{b.status?.toUpperCase()}</Text>
-                    </View>
-                  </View>
-                </View>
-              );
-            })
-          )}
-        </View>
-
-        {/* Quick Actions */}
-        <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[s.sectionTitle, { color: colors.text }]}>Quick Actions</Text>
-          <View style={s.actionsGrid}>
+          <View style={s.actionsList}>
             {quickActions.map(a => (
               <TouchableOpacity
                 key={a.label}
-                style={[s.actionBtn, { backgroundColor: colors.background, borderColor: colors.border }]}
+                style={[s.actionRow, { backgroundColor: colors.background, borderColor: colors.border }]}
                 onPress={() => router.push(a.route as any)}
-                activeOpacity={0.8}
+                activeOpacity={0.7}
               >
-                <a.Icon size={26} color={colors.tint} />
+                <View style={[s.actionIconWrap, { backgroundColor: a.bg }]}>
+                  <a.Icon size={18} color={a.color} />
+                </View>
                 <Text style={[s.actionLabel, { color: colors.text }]}>{a.label}</Text>
               </TouchableOpacity>
             ))}
@@ -261,39 +234,37 @@ export default function DashboardScreen() {
 
         {/* System Status */}
         <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={s.systemStatusRow}>
+          <View style={[s.systemStatusRow, { borderBottomColor: colors.border }]}>
             <View style={[s.statusIconWrap, { backgroundColor: `${colors.tint}1A` }]}>
               <Shield size={16} color={colors.tint} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[s.systemStatusSub, { color: colors.icon }]}>System Status</Text>
-              <Text style={[s.systemStatusTitle, { color: colors.text }]}>All Operations Normal</Text>
+              <Text style={[s.systemStatusSub, { color: colors.icon }]}>SYSTEM STATUS</Text>
+              <Text style={[s.systemStatusTitle, { color: colors.text }]}>ALL OPERATIONS NORMAL</Text>
             </View>
             <View style={s.pulseDot} />
           </View>
           <Text style={[s.systemStatusNote, { color: colors.icon }]}>
-            Ensure you book your return trip before the{' '}
-            <Text style={{ color: colors.tint, fontWeight: '800' }}>1:00 PM</Text> deadline daily.
+            Ensure you book your return trip before the 1:00 PM deadline daily.
           </Text>
         </View>
 
-        {/* Book New Trip */}
+        {/* Bottom Actions */}
         <TouchableOpacity
-          style={[s.bookNewBtn, { backgroundColor: colors.tint }]}
+          style={[s.bookNewBtn, { backgroundColor: colors.tint, shadowColor: colors.tint }]}
           onPress={() => router.push('/(student)/book-trip')}
           activeOpacity={0.85}
         >
-          <Bus size={18} color="#000" />
-          <Text style={s.bookNewTxt}>Book New Trip</Text>
+          <Bus size={14} color="#000" />
+          <Text style={s.bookNewTxt}>BOOK NEW TRIP</Text>
         </TouchableOpacity>
 
-        {/* Sign Out */}
-        <TouchableOpacity style={[s.logoutBtn, { borderColor: 'rgba(239,68,68,0.2)' }]} onPress={logout}>
+        {/* <TouchableOpacity style={[s.logoutBtn, { borderColor: 'rgba(239,68,68,0.2)' }]} onPress={logout}>
           <LogOut size={16} color="#ef4444" />
-          <Text style={s.logoutTxt}>Sign Out</Text>
-        </TouchableOpacity>
+          <Text style={s.logoutTxt}>SIGN OUT</Text>
+        </TouchableOpacity> */}
 
-        <View style={{ height: 100 }} />
+        <View style={{ height: 50 }} />
       </ScrollView>
     </View>
   );
@@ -303,65 +274,58 @@ const s = StyleSheet.create({
   root:             { flex: 1 },
   scroll:           { padding: 20, paddingTop: 16 },
   center:           { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadingTxt:       { fontSize: 11, fontWeight: '700', letterSpacing: 2 },
+  loadingTxt:       { fontSize: 10, fontWeight: '900', letterSpacing: 3, textTransform: 'uppercase' },
 
   welcome:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  welcomeSub:       { fontSize: 9, fontWeight: '700', letterSpacing: 3, marginBottom: 4 },
-  welcomeName:      { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
+  welcomeSub:       { fontSize: 9, fontWeight: '900', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 4 },
+  welcomeName:      { fontSize: 24, fontWeight: '900', letterSpacing: -0.5, textTransform: 'uppercase' },
   avatarCircle:     { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  avatarTxt:        { fontSize: 15, fontWeight: '800' },
+  avatarTxt:        { fontSize: 15, fontWeight: '900' },
 
-  statsRow:         { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  statCard:         { flex: 1, borderWidth: 1, borderRadius: 18, padding: 12 },
-  statCardTop:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
-  statLabel:        { fontSize: 8, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', flex: 1 },
-  statIconWrap:     { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  statValue:        { fontSize: 22, fontWeight: '800' },
+  statsRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 20 },
+  statCard:         { width: cardWidth, borderWidth: 1, borderRadius: 16, padding: 16 },
+  statCardTop:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
+  statLabel:        { fontSize: 9, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase', flex: 1, marginRight: 8 },
+  statIconWrap:     { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  statValue:        { fontSize: 28, fontWeight: '900', letterSpacing: -1 },
 
-  card:             { borderWidth: 1, borderRadius: 24, padding: 18, marginBottom: 14 },
-  cardHeaderRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
-  cardTitle:        { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', flex: 1 },
-  sectionTitle:     { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.5, flex: 1 },
-  viewAll:          { fontSize: 11, fontWeight: '700' },
+  card:             { borderWidth: 1, borderRadius: 20, padding: 18, marginBottom: 16 },
+  cardHeaderRow:    { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  cardTitle:        { fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5, flex: 1 },
+  sectionHeader:    { borderBottomWidth: 1, borderBottomColor: 'rgba(150,150,150,0.2)', paddingBottom: 12, marginBottom: 12 },
+  sectionTitle:     { fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2 },
 
-  statusBadge:      { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 20, borderWidth: 1 },
-  statusTxt:        { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+  statusBadge:      { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
+  statusTxt:        { fontSize: 9, fontWeight: '900', letterSpacing: 1 },
 
-  detailsGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginBottom: 14 },
+  detailsGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
   detailItem:       { minWidth: '42%' },
-  detailLabel:      { fontSize: 9, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 3 },
-  detailValue:      { fontSize: 13, fontWeight: '700', textTransform: 'uppercase' },
+  detailLabel:      { fontSize: 9, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 },
+  detailValue:      { fontSize: 13, fontWeight: '900', textTransform: 'uppercase' },
 
-  trackBtn:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderRadius: 14, paddingVertical: 12 },
-  trackTxt:         { fontSize: 12, fontWeight: '700', letterSpacing: 1 },
+  trackBtn:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderRadius: 12, paddingVertical: 10 },
+  trackTxt:         { fontSize: 10, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase' },
 
-  emptyCard:        { alignItems: 'center', paddingVertical: 28 },
-  emptyTitle:       { fontSize: 13, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
-  emptyDesc:        { fontSize: 11, textAlign: 'center', marginBottom: 4 },
+  emptyCard:        { alignItems: 'center', paddingVertical: 32, borderStyle: 'dashed' },
+  emptyIconWrap:    { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  emptyTitle:       { fontSize: 12, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8 },
+  emptyDesc:        { fontSize: 10, textAlign: 'center', fontWeight: '700', lineHeight: 16, textTransform: 'uppercase', letterSpacing: 0.5 },
 
-  bookBtn:          { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14, marginTop: 12 },
-  bookBtnTxt:       { color: '#000', fontWeight: '700', fontSize: 13 },
+  actionsList:      { gap: 8 },
+  actionRow:        { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 14, padding: 12 },
+  actionIconWrap:   { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  actionLabel:      { fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1.5 },
 
-  bookingRow:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1 },
-  bookingRoute:     { fontSize: 13, fontWeight: '700', marginBottom: 3 },
-  bookingMeta:      { fontSize: 10, fontWeight: '500', textTransform: 'uppercase' },
-  bookingRight:     { alignItems: 'flex-end', gap: 6 },
-  bookingSeat:      { fontSize: 12, fontWeight: '800' },
-
-  actionsGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 14 },
-  actionBtn:        { width: '47%', borderWidth: 1, borderRadius: 18, padding: 16, alignItems: 'center', gap: 8 },
-  actionLabel:      { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, textAlign: 'center' },
-
-  systemStatusRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  statusIconWrap:   { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  systemStatusSub:  { fontSize: 9, fontWeight: '700', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 2 },
-  systemStatusTitle:{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
-  systemStatusNote: { fontSize: 10, lineHeight: 16 },
+  systemStatusRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: 1, paddingBottom: 12, marginBottom: 12 },
+  statusIconWrap:   { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  systemStatusSub:  { fontSize: 9, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 2 },
+  systemStatusTitle:{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase' },
+  systemStatusNote: { fontSize: 10, fontWeight: '500', lineHeight: 16 },
   pulseDot:         { width: 8, height: 8, borderRadius: 4, backgroundColor: '#22c55e' },
 
-  bookNewBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 20, paddingVertical: 18, marginBottom: 12 },
-  bookNewTxt:       { color: '#000', fontWeight: '800', fontSize: 13, textTransform: 'uppercase', letterSpacing: 2 },
+  bookNewBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 16, paddingVertical: 16, marginBottom: 12, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
+  bookNewTxt:       { color: '#000', fontWeight: '900', fontSize: 11, textTransform: 'uppercase', letterSpacing: 2 },
 
-  logoutBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderRadius: 18, paddingVertical: 14 },
-  logoutTxt:        { color: '#ef4444', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2 },
+  logoutBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderRadius: 16, paddingVertical: 14 },
+  logoutTxt:        { color: '#ef4444', fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2 },
 });

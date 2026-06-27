@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  ActivityIndicator, StyleSheet, Alert, Modal,
+  ActivityIndicator, StyleSheet, Alert, Modal, TextInput
 } from 'react-native';
 import {
-  Calendar, MapPin, ArrowRight, Bus,
-  Clock, Check, X, Route,
+  Calendar, MapPin, Bus, Clock, Check, X, Route, Info
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Api from '../../src/services/api';
@@ -45,6 +44,7 @@ export default function MyTripsScreen() {
   const colors = useThemeColor();
 
   const [tab, setTab]             = useState<TripStatus>('upcoming');
+  const [filterDate, setFilterDate] = useState<string>(''); // Added Date Filter
   const [bookings, setBookings]   = useState<any[]>([]);
   const [routes, setRoutes]       = useState<any[]>([]);
   const [settings, setSettings]   = useState<any>(null);
@@ -68,9 +68,21 @@ export default function MyTripsScreen() {
         Api.get('/routes'),
         Api.get('/settings'),
       ]);
-      setBookings(bRes.data?.data?.bookings || []);
+
+      // Robust fetching identical to web
+      let fetchedBookings = bRes.data?.data?.bookings || 
+                            bRes.data?.bookings || 
+                            bRes.data?.data || 
+                            bRes.data || [];
+                            
+      if (!Array.isArray(fetchedBookings)) {
+        fetchedBookings = [];
+      }
+
+      setBookings(fetchedBookings);
       setRoutes(rRes.data?.data || []);
-      const cfg = sRes.data?.data?.settings;
+      
+      const cfg = sRes.data?.data?.settings || sRes.data?.settings;
       if (cfg) setSettings(cfg);
     } catch (err) {
       console.error('Failed to fetch', err);
@@ -128,7 +140,7 @@ export default function MyTripsScreen() {
   };
 
   const handleCancel = (id: string) => {
-    Alert.alert('Cancel Booking', 'Cancel this booking?', [
+    Alert.alert('Cancel Booking', 'Are you sure you want to cancel this booking?', [
       { text: 'No', style: 'cancel' },
       {
         text: 'Yes, Cancel', style: 'destructive',
@@ -190,12 +202,21 @@ export default function MyTripsScreen() {
     }
   };
 
+  // Robust mapping like the web version
   const mappedTrips = bookings.map(b => {
-    const bd    = b.date ? new Date(b.date) : null;
+    const bd = b.date ? new Date(b.date) : null;
     let currentStatus: TripStatus = 'upcoming';
-    if (b.status === 'cancelled')              currentStatus = 'cancelled';
-    else if (b.attendanceStatus === 'completed') currentStatus = 'completed';
-    else if (b.attendanceStatus === 'missed')    currentStatus = 'missed';
+
+    if (b.status === "completed" || b.attendanceStatus === "completed") {
+      currentStatus = "completed";
+    } else if (b.status === "missed" || b.attendanceStatus === "missed") {
+      currentStatus = "missed";
+    } else if (b.status === "cancelled" || b.status === "cancelled_by_admin") {
+      currentStatus = "cancelled";
+    } else if (["pending", "booked", "assigned", "active", "in-progress"].includes(b.status)) {
+      currentStatus = "upcoming";
+    }
+
     return {
       raw: b, id: b._id, status: currentStatus,
       date: bd ? bd.toDateString() : 'TBA',
@@ -207,21 +228,29 @@ export default function MyTripsScreen() {
     };
   });
 
+  // Date filtering logic
+  const dateFilteredTrips = mappedTrips.filter(t => {
+    if (!filterDate) return true;
+    return t.raw.date && new Date(t.raw.date).toISOString().split('T')[0] === filterDate;
+  });
+
   const counts = {
-    upcoming:  mappedTrips.filter(t => t.status === 'upcoming').length,
-    completed: mappedTrips.filter(t => t.status === 'completed').length,
-    missed:    mappedTrips.filter(t => t.status === 'missed').length,
-    cancelled: mappedTrips.filter(t => t.status === 'cancelled').length,
+    upcoming:  dateFilteredTrips.filter(t => t.status === 'upcoming').length,
+    completed: dateFilteredTrips.filter(t => t.status === 'completed').length,
+    missed:    dateFilteredTrips.filter(t => t.status === 'missed').length,
+    cancelled: dateFilteredTrips.filter(t => t.status === 'cancelled').length,
   };
-  const list = mappedTrips.filter(t => t.status === tab);
+  
+  const list = dateFilteredTrips.filter(t => t.status === tab);
 
   const getBookingBadge = (status: string, colors: any) => {
     if (status === 'pending')   return { bg: 'rgba(96,165,250,0.1)',  border: 'rgba(96,165,250,0.2)',  text: '#60a5fa',  label: '⏳ Pending' };
+    if (status === 'booked')    return { bg: 'rgba(96,165,250,0.1)',  border: 'rgba(96,165,250,0.2)',  text: '#60a5fa',  label: '⏳ Booked' };
     if (status === 'assigned')  return { bg: `${colors.tint}1A`,      border: `${colors.tint}33`,      text: colors.tint, label: '🚌 Bus Assigned' };
     if (status === 'active')    return { bg: 'rgba(34,197,94,0.1)',   border: 'rgba(34,197,94,0.2)',   text: '#22c55e',  label: '✓ Active' };
     if (status === 'completed') return { bg: 'rgba(96,165,250,0.1)',  border: 'rgba(96,165,250,0.2)',  text: '#60a5fa',  label: '✓ Done' };
     if (status === 'missed')    return { bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.2)',   text: '#ef4444',  label: '✗ Missed' };
-    return                             { bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.2)',   text: '#ef4444',  label: 'Cancelled' };
+    return                             { bg: 'rgba(115,115,115,0.1)', border: 'rgba(115,115,115,0.2)', text: '#737373',  label: 'Cancelled' };
   };
 
   const getCardBorderColor = (status: TripStatus) => {
@@ -274,24 +303,42 @@ export default function MyTripsScreen() {
         showsVerticalScrollIndicator={false}
       >
 
-        {/* Tab Bar */}
-        <View style={[s.tabBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          {(['upcoming', 'completed', 'missed', 'cancelled'] as TripStatus[]).map(t => (
-            <TouchableOpacity
-              key={t}
-              style={[
-                s.tab,
-                tab === t && { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
-              ]}
-              onPress={() => setTab(t)}
-              activeOpacity={0.7}
-            >
-              <Text style={[s.tabText, { color: colors.icon }, tab === t && { color: colors.tint }]}>
-                {t.charAt(0).toUpperCase() + t.slice(1)}
-                <Text style={s.tabCount}> ({counts[t]})</Text>
-              </Text>
-            </TouchableOpacity>
-          ))}
+        {/* Tab Bar & Filter Area */}
+        <View style={s.topControls}>
+          <View style={[s.tabBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {(['upcoming', 'completed', 'missed', 'cancelled'] as TripStatus[]).map(t => (
+              <TouchableOpacity
+                key={t}
+                style={[
+                  s.tab,
+                  tab === t && { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
+                ]}
+                onPress={() => setTab(t)}
+                activeOpacity={0.7}
+              >
+                <Text style={[s.tabText, { color: colors.icon }, tab === t && { color: colors.tint }]}>
+                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                  <Text style={s.tabCount}> ({counts[t]})</Text>
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Date Filter Input */}
+          <View style={s.filterRow}>
+            <TextInput
+              style={[s.dateInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
+              placeholder="Filter by YYYY-MM-DD"
+              placeholderTextColor={colors.icon}
+              value={filterDate}
+              onChangeText={setFilterDate}
+            />
+            {!!filterDate && (
+              <TouchableOpacity style={s.clearBtn} onPress={() => setFilterDate('')}>
+                <X size={14} color="#ef4444" />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* Trip Cards */}
@@ -302,7 +349,7 @@ export default function MyTripsScreen() {
           const badge         = getBookingBadge(t.bookingStatus, colors);
 
           return (
-            <View key={t.id} style={[s.card, { backgroundColor: colors.card, borderColor: getCardBorderColor(t.status) }]}>
+            <View key={t.id} style={[s.card, { backgroundColor: colors.card, borderColor: getCardBorderColor(t.status) }, t.status === 'cancelled' && { opacity: 0.75 }]}>
 
               {/* Card Header */}
               <View style={s.cardHeader}>
@@ -379,25 +426,33 @@ export default function MyTripsScreen() {
                     </View>
                   )}
 
-                  {/* Edit + Cancel */}
-                  <View style={s.rowGap}>
-                    <TouchableOpacity
-                      style={[s.actionBtn, s.actionAmber, !windowOpen && s.btnDisabled]}
-                      onPress={() => windowOpen && openEdit(t.raw)}
-                      disabled={!windowOpen}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[s.actionText, { color: colors.tint }]}>✎ Edit</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[s.actionBtn, s.actionRed]}
-                      onPress={() => handleCancel(t.id)}
-                      activeOpacity={0.8}
-                    >
-                      <X size={12} color="#ef4444" />
-                      <Text style={[s.actionText, { color: '#ef4444' }]}>Cancel</Text>
-                    </TouchableOpacity>
-                  </View>
+                  {/* Edit + Cancel OR Edit Disabled Warning */}
+                  {['pending', 'booked'].includes(t.bookingStatus) ? (
+                    <View style={s.rowGap}>
+                      <TouchableOpacity
+                        style={[s.actionBtn, s.actionAmber, !windowOpen && s.btnDisabled]}
+                        onPress={() => windowOpen && openEdit(t.raw)}
+                        disabled={!windowOpen}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[s.actionText, { color: colors.tint }]}>✎ Edit</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[s.actionBtn, s.actionRed]}
+                        onPress={() => handleCancel(t.id)}
+                        activeOpacity={0.8}
+                      >
+                        <X size={12} color="#ef4444" />
+                        <Text style={[s.actionText, { color: '#ef4444' }]}>Cancel</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={[s.disabledActionBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                      <Info size={12} color={colors.icon} />
+                      <Text style={[s.disabledActionText, { color: colors.icon }]}>Edit disabled (Bus Assigned)</Text>
+                    </View>
+                  )}
+
                 </View>
               )}
             </View>
@@ -525,10 +580,15 @@ const s = StyleSheet.create({
   toast:         { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, marginTop: 8, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 16, borderWidth: 1 },
   toastText:     { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
 
-  tabBar:        { flexDirection: 'row', borderWidth: 1, borderRadius: 14, padding: 4, marginBottom: 20, gap: 4 },
+  topControls:   { marginBottom: 20 },
+  tabBar:        { flexDirection: 'row', borderWidth: 1, borderRadius: 14, padding: 4, marginBottom: 12, gap: 4 },
   tab:           { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center' },
   tabText:       { fontSize: 10, fontWeight: '700', textTransform: 'capitalize' },
   tabCount:      { fontSize: 9, opacity: 0.5 },
+
+  filterRow:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dateInput:     { flex: 1, borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10, fontSize: 12, fontWeight: '600' },
+  clearBtn:      { padding: 10, borderRadius: 10, backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)' },
 
   card:          { borderWidth: 1, borderRadius: 20, padding: 18, marginBottom: 14 },
   cardHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
@@ -561,6 +621,9 @@ const s = StyleSheet.create({
   actionAmber:   { backgroundColor: 'rgba(247,160,27,0.1)',  borderColor: 'rgba(247,160,27,0.2)' },
   actionRed:     { backgroundColor: 'rgba(239,68,68,0.05)',  borderColor: 'rgba(239,68,68,0.2)' },
   btnDisabled:   { opacity: 0.3 },
+
+  disabledActionBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 11, borderRadius: 12, borderWidth: 1, opacity: 0.8 },
+  disabledActionText: { fontSize: 10, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
 
   emptyWrap:     { alignItems: 'center', justifyContent: 'center', paddingTop: 80, opacity: 0.4 },
   emptyIcon:     { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },

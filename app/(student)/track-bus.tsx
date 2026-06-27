@@ -9,8 +9,6 @@ import { router } from "expo-router";
 import { io, Socket } from "socket.io-client";
 import api, { BASE_URL } from "../../src/services/api";
 import { useThemeColor } from "../../constants/theme";
-import TopBar from '../../src/components/TopBar';
-
 
 const SOCKET_URL = BASE_URL.replace("/api", "");
 
@@ -24,9 +22,13 @@ interface Booking {
   _id: string;
   pickup_point: string;
   status: string;
+  route?: any;
   trip: {
     _id: string;
     bus_number: string;
+    driver?: string;
+    status: string;
+    bus?: { _id: string };
     current_location?: { lat: number; lng: number };
     route?: { stops: Stop[] };
   };
@@ -35,8 +37,8 @@ interface Booking {
 function StopItem({ stop, isPickup, index }: { stop: Stop; isPickup: boolean; index: number }) {
   const colors = useThemeColor();
   return (
-    <View style={styles.stopRow}>
-      <View style={[styles.stopDot, { backgroundColor: isPickup ? "#f7a01b" : colors.border }]}>
+    <View style={[styles.stopRow, !isPickup && { opacity: 0.5 }]}>
+      <View style={[styles.stopDot, { backgroundColor: isPickup ? "#f7a01b" : colors.card, borderColor: colors.border, borderWidth: isPickup ? 0 : 1 }]}>
         <Text style={[styles.stopNum, { color: isPickup ? "#0f1115" : colors.icon }]}>{index + 1}</Text>
       </View>
       <View style={styles.stopInfo}>
@@ -57,16 +59,25 @@ export default function TrackBusScreen() {
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
   const [eta, setEta] = useState(12);
-  const [busPosition, setBusPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [activeBuses, setActiveBuses] = useState<Record<string, { lat: number; lng: number }>>({});
+  
   const socketRef = useRef<Socket | null>(null);
   const mapRef = useRef<MapView>(null);
 
+  // Fetch student active booking
   useEffect(() => {
     const fetchBooking = async () => {
       try {
         const res = await api.get("/bookings/my");
         const bookings = res.data?.data?.bookings || [];
-        const active = bookings.find((b: any) => b.status !== "cancelled" && b.trip);
+        
+        // Exact logic from web matching trip statuses
+        const active = bookings.find((b: any) => 
+          b.status !== 'cancelled' && 
+          b.trip && 
+          ['scheduled', 'active', 'in_progress', 'in-progress'].includes(b.trip.status)
+        );
+        
         setBooking(active || null);
       } catch (e) {
         console.error(e);
@@ -77,39 +88,64 @@ export default function TrackBusScreen() {
     fetchBooking();
   }, []);
 
+  // Socket connections
   useEffect(() => {
     if (!booking?.trip?._id) return;
 
-    socketRef.current = io(SOCKET_URL, { transports: ["websocket", "polling"] });
-    socketRef.current.emit("join-trip-room", booking.trip._id);
+    const studentRouteId = booking.route?._id || booking.route;
 
-    socketRef.current.on("bus_location_update", (data: any) => {
-      if (data.tripId === booking.trip._id && data.location) {
-        const pos = { lat: data.location.lat, lng: data.location.lng };
-        setBusPosition(pos);
-        setEta(prev => prev > 1 ? prev - 1 : 1);
+    socketRef.current = io(SOCKET_URL, { transports: ["websocket", "polling"] });
+    
+    // Join specific rooms
+    socketRef.current.emit("join_trip_room", booking.trip._id);
+    if (studentRouteId) {
+      socketRef.current.emit("join-route-room", studentRouteId);
+    }
+
+    // Legacy listener 
+    socketRef.current.on("bus_location_updated", (data: any) => {
+      if (data.lat !== undefined && data.lng !== undefined) {
+        const legacyBusId = booking.trip?.bus?._id || booking.trip?.bus_number || 'legacy-bus';
+        
+        setActiveBuses(prev => ({ ...prev, [legacyBusId]: data }));
+        setEta(prev => (prev > 1 ? prev - 1 : 1));
+        
         mapRef.current?.animateToRegion({
-          latitude: pos.lat, longitude: pos.lng,
+          latitude: data.lat, longitude: data.lng,
           latitudeDelta: 0.01, longitudeDelta: 0.01,
         });
       }
     });
 
+    // Global listener
+    socketRef.current.on("bus_location_update", (data: any) => {
+      if (data.lat !== undefined && data.lng !== undefined && data.busId) {
+        setActiveBuses(prev => ({ ...prev, [data.busId]: data }));
+        
+        if (data.tripId && String(data.tripId) === String(booking.trip?._id)) {
+          setEta(prev => (prev > 1 ? prev - 1 : 1));
+          mapRef.current?.animateToRegion({
+            latitude: data.lat, longitude: data.lng,
+            latitudeDelta: 0.01, longitudeDelta: 0.01,
+          });
+        }
+      }
+    });
+
     return () => {
-        
-        
       socketRef.current?.emit("leave-trip-room", booking.trip._id);
+      if (studentRouteId) {
+        socketRef.current?.emit("leave-route-room", studentRouteId);
+      }
       socketRef.current?.disconnect();
     };
   }, [booking]);
 
   if (loading) {
     return (
-        
       <View style={[styles.center, { backgroundColor: colors.background }]}>
-        
         <ActivityIndicator size="large" color="#f7a01b" />
-        <Text style={[styles.loadingText, { color: colors.icon }]}>Connecting to Fleet GPS...</Text>
+        <Text style={[styles.loadingText, { color: colors.icon }]}>Connecting to GPS...</Text>
       </View>
     );
   }
@@ -138,10 +174,14 @@ export default function TrackBusScreen() {
 
   const stops = booking.trip?.route?.stops || [];
   const busNumber = booking.trip?.bus_number || "AWAITING ASSIGNMENT";
+  const driverName = booking.trip?.driver || "Pending Driver";
   const pickupStop = stops.find(s => s._id === booking.pickup_point);
 
-  const centerLat = busPosition?.lat || booking.trip?.current_location?.lat || pickupStop?.location?.lat || 24.0889;
-  const centerLng = busPosition?.lng || booking.trip?.current_location?.lng || pickupStop?.location?.lng || 32.8998;
+  // Fallback Center coordinates
+  const activeBusList = Object.values(activeBuses);
+  const firstBusPos = activeBusList[0];
+  const centerLat = firstBusPos?.lat || booking.trip?.current_location?.lat || pickupStop?.location?.lat || 24.0889;
+  const centerLng = firstBusPos?.lng || booking.trip?.current_location?.lng || pickupStop?.location?.lng || 32.8998;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -173,12 +213,19 @@ export default function TrackBusScreen() {
         showsUserLocation
         showsMyLocationButton={false}
       >
-        <Marker
-          coordinate={{ latitude: centerLat, longitude: centerLng }}
-          title={busNumber}
-        >
-          <View style={styles.busMarker} />
-        </Marker>
+        {/* Render markers for all active buses */}
+        {Object.entries(activeBuses).map(([id, bus]) => (
+          <Marker key={id} coordinate={{ latitude: bus.lat, longitude: bus.lng }} title={busNumber}>
+            <View style={styles.busMarker} />
+          </Marker>
+        ))}
+
+        {/* Fallback marker if no live socket data yet */}
+        {activeBusList.length === 0 && (
+          <Marker coordinate={{ latitude: centerLat, longitude: centerLng }} title={busNumber}>
+            <View style={styles.busMarker} />
+          </Marker>
+        )}
       </MapView>
 
       {/* Bottom Sheet */}
@@ -192,7 +239,7 @@ export default function TrackBusScreen() {
             </View>
             <View>
               <Text style={[styles.busNumber, { color: colors.text }]}>{busNumber}</Text>
-              <Text style={[styles.busDriver, { color: colors.icon }]}>42 km/h</Text>
+              <Text style={[styles.busDriver, { color: colors.icon }]}>Driver: {driverName} • 42 km/h</Text>
             </View>
           </View>
           <Navigation size={20} color="#f7a01b" />
