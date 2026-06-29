@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { MapPin, Navigation, Target, TrendingUp, Bus, CheckCircle } from "lucide-react-native";
+import { Bus, CheckCircle, MapPin, Navigation, Target } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -12,8 +12,8 @@ import {
 import MapView, { Callout, Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { io, Socket } from "socket.io-client";
 import { useThemeColor } from "../../constants/theme";
-import api from "../../src/services/api";
 import TopBar from "../../src/components/TopBar";
+import api from "../../src/services/api";
 const BACKEND_URL = 'http://192.168.1.11:5001'; // نفس IP الـ backend
 
 // ─── Types ────────────────────────────────────────────────────────────────────

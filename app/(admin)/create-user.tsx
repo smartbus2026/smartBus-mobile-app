@@ -1,44 +1,97 @@
-import BottomBar from "@/src/components/sidebar";
-import { useRouter } from 'expo-router';
+// app/(admin)/create-user.tsx
+import { useEffect, useState } from 'react';
 import {
-    AlertCircle,
-    CheckCircle,
-    Eye, EyeOff,
-    Hash,
-    Lock,
-    Phone,
-    ShieldCheck,
-    User
-} from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
-import {
-    ActivityIndicator, KeyboardAvoidingView, Platform,
-    ScrollView,
-    Text, TextInput, TouchableOpacity,
-    View
+  ActivityIndicator, KeyboardAvoidingView, Platform,
+  ScrollView, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
-import { useThemeColor } from '../../constants/theme';
+import {
+  AlertCircle, CheckCircle, Eye, EyeOff,
+  Hash, Lock, Phone, ShieldCheck, User, UserPlus,
+} from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { Controller, useForm } from 'react-hook-form';
+import { Colors } from '../../constants/theme';
+import { useTheme } from '../../src/context/ThemeContext';
 import Api from '../../src/services/api';
 import { RegisterPayload } from '../../src/types/index';
 import TopBar from '../../src/components/TopBar';
+import BottomBar from '@/src/components/sidebar';
+
+// ─── Section Card ─────────────────────────────────────────────────────────────
+const SectionCard: React.FC<{
+  icon: React.ReactNode; title: string; subtitle: string;
+  children: React.ReactNode; colors: any;
+}> = ({ icon, title, subtitle, children, colors }) => (
+  <View style={{
+    borderRadius: 24, borderWidth: 1, padding: 24, marginBottom: 16,
+    backgroundColor: colors.card, borderColor: colors.border,
+  }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 24 }}>
+      <View style={{
+        width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
+        backgroundColor: `${colors.tint}1A`, borderWidth: 1, borderColor: `${colors.tint}33`,
+      }}>
+        {icon}
+      </View>
+      <View>
+        <Text style={{ fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>
+          {title}
+        </Text>
+        <Text style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, color: colors.icon, marginTop: 2 }}>
+          {subtitle}
+        </Text>
+      </View>
+    </View>
+    {children}
+  </View>
+);
+
+// ─── Field ────────────────────────────────────────────────────────────────────
+const Field: React.FC<{
+  control: any; name: string; label: string; placeholder: string;
+  icon: any; secure?: boolean; rightIcon?: any; onRightIconPress?: () => void; colors: any;
+}> = ({ control, name, label, placeholder, icon: Icon, secure, rightIcon: RightIcon, onRightIconPress, colors }) => (
+  <View style={{ marginBottom: 16 }}>
+    <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginBottom: 8 }}>
+      {label}
+    </Text>
+    <View style={{
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      borderRadius: 14, paddingHorizontal: 16, borderWidth: 1, height: 52,
+      backgroundColor: colors.background, borderColor: colors.border,
+    }}>
+      <Icon size={16} color={colors.icon} />
+      <Controller
+        control={control} name={name}
+        render={({ field: { onChange, onBlur, value } }) => (
+          <TextInput
+            style={{ flex: 1, fontSize: 14, fontWeight: '700', color: colors.text }}
+            placeholder={placeholder} placeholderTextColor={colors.icon}
+            secureTextEntry={secure} onBlur={onBlur}
+            onChangeText={onChange} value={value} autoCapitalize="none"
+          />
+        )}
+      />
+      {RightIcon && (
+        <TouchableOpacity onPress={onRightIconPress} style={{ padding: 4 }}>
+          <RightIcon size={16} color={colors.icon} />
+        </TouchableOpacity>
+      )}
+    </View>
+  </View>
+);
 
 export default function CreateUserPage() {
-  const colors = useThemeColor();
+  const { theme } = useTheme();
+  const colors = Colors[theme];
   const router = useRouter();
+
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | null }>({ msg: '', type: null });
+  const [loading, setLoading]           = useState(false);
+  const [toast, setToast]               = useState<{ msg: string; type: 'success' | 'error' | null }>({ msg: '', type: null });
 
   const { control, handleSubmit, watch } = useForm<RegisterPayload & { role: 'student' | 'admin' }>({
-    defaultValues: {
-      role: 'student',
-      name: '',
-      email: '',
-      password: '',
-      phone_number: '',
-      student_id: ''
-    },
+    defaultValues: { role: 'student', name: '', email: '', password: '', phone_number: '', student_id: '' },
   });
 
   const selectedRole = watch('role');
@@ -52,16 +105,12 @@ export default function CreateUserPage() {
 
   const onSubmit = async (data: any) => {
     if (!data.name || !data.email || !data.password) {
-      setToast({ msg: 'Name, Email and Password are required', type: 'error' });
-      return;
+      setToast({ msg: 'Name, Email and Password are required', type: 'error' }); return;
     }
     setLoading(true);
     try {
       await Api.post('/auth/register', {
-        name: data.name,
-        email: data.email,
-        password: data.password,
-        role: data.role,
+        name: data.name, email: data.email, password: data.password, role: data.role,
         phone_number: data.phone_number,
         ...(data.role === 'student' ? { student_id: data.student_id } : {}),
       });
@@ -69,82 +118,68 @@ export default function CreateUserPage() {
       setTimeout(() => router.back(), 1500);
     } catch (error: any) {
       setToast({ msg: error.response?.data?.message || 'Registration failed.', type: 'error' });
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <TopBar title="Create User" showBack />
 
-      {/* ── Top Bar ── */}
-      <TopBar
-        title="Create User"
-        showBack
-      />
-
-      {/* ── Toast ── */}
+      {/* Toast */}
       {toast.msg && (
         <View style={{
           position: 'absolute', top: 80, alignSelf: 'center', zIndex: 50,
-          flexDirection: 'row', alignItems: 'center', gap: 10,
-          paddingVertical: 12, paddingHorizontal: 20,
-          borderRadius: 999, borderWidth: 1,
-          backgroundColor: colors.card,
-          borderColor: toast.type === 'success' ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)",
-          shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15,
+          flexDirection: 'row', alignItems: 'center', gap: 8,
+          paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1,
+          backgroundColor: toast.type === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+          borderColor: toast.type === 'success' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)',
         }}>
           {toast.type === 'success'
-            ? <CheckCircle size={16} color="#22c55e" />
-            : <AlertCircle size={16} color="#ef4444" />
+            ? <CheckCircle size={14} color="#22c55e" />
+            : <AlertCircle size={14} color="#ef4444" />
           }
           <Text style={{
-            fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2,
-            color: toast.type === 'success' ? "#22c55e" : "#ef4444",
+            fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1,
+            color: toast.type === 'success' ? '#22c55e' : '#ef4444',
           }}>
             {toast.msg}
           </Text>
         </View>
       )}
 
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-        <ScrollView
-          contentContainerStyle={{ padding: 20, paddingTop: 16, paddingBottom: 120 }}
-          showsVerticalScrollIndicator={false}
-        >
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+
+          {/* Header */}
+          <View style={{ marginBottom: 24 }}>
+            <Text style={{ fontSize: 22, fontWeight: '900', textTransform: 'uppercase', letterSpacing: -0.5, color: colors.text }}>
+              CREATE{' '}<Text style={{ color: colors.tint }}>USER</Text>
+            </Text>
+            <Text style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginTop: 2 }}>
+              PROVISION NEW ACCOUNT
+            </Text>
+          </View>
 
           {/* ── Role Selection ── */}
-          <Text style={{
-            fontSize: 9, fontWeight: '800', textTransform: 'uppercase',
-            letterSpacing: 3, marginBottom: 10, marginLeft: 4, color: colors.icon,
-          }}>
-            Authority Level
-          </Text>
-          <View style={{ marginBottom: 20 }}>
+          <SectionCard icon={<ShieldCheck size={22} color={colors.tint} />} title="Authority Level" subtitle="Select User Role" colors={colors}>
             <Controller
-              control={control}
-              name="role"
+              control={control} name="role"
               render={({ field: { onChange, value } }) => (
                 <View style={{
-                  flexDirection: 'row', padding: 4, borderRadius: 18, borderWidth: 1,
-                  backgroundColor: colors.card, borderColor: colors.border,
+                  flexDirection: 'row', padding: 4, borderRadius: 16, borderWidth: 1,
+                  backgroundColor: colors.background, borderColor: colors.border,
                 }}>
-                  {['student', 'admin'].map((role) => {
+                  {['student', 'admin'].map(role => {
                     const isActive = value === role;
                     return (
                       <TouchableOpacity
-                        key={role}
+                        key={role} activeOpacity={0.8} onPress={() => onChange(role)}
                         style={{
-                          flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 14,
+                          flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 12,
                           backgroundColor: isActive ? colors.tint : 'transparent',
                         }}
-                        onPress={() => onChange(role)}
-                        activeOpacity={0.8}
                       >
-                        <Text style={{
-                          fontSize: 10, fontWeight: '800', letterSpacing: 2,
-                          color: isActive ? '#000' : colors.icon,
-                        }}>
+                        <Text style={{ fontSize: 11, fontWeight: '900', letterSpacing: 2, textTransform: 'uppercase', color: isActive ? '#000' : colors.icon }}>
                           {role.toUpperCase()}
                         </Text>
                       </TouchableOpacity>
@@ -153,55 +188,45 @@ export default function CreateUserPage() {
                 </View>
               )}
             />
-          </View>
+          </SectionCard>
 
-          {/* ── Form Card ── */}
-          <View style={{
-            borderWidth: 1, borderRadius: 24, padding: 18,
-            backgroundColor: colors.card, borderColor: colors.border,
-          }}>
-
-            <CustomInput control={control} name="name"         label="Full Name"           placeholder="e.g. Ahmed Mohamed"    icon={User} />
-            <CustomInput control={control} name="email"        label="Institutional Email" placeholder="name@university.edu"  icon={ShieldCheck} />
-
+          {/* ── Form ── */}
+          <SectionCard icon={<UserPlus size={22} color={colors.tint} />} title="Account Details" subtitle="Personal Information" colors={colors}>
+            <Field control={control} name="name"         label="Full Name"           placeholder="e.g. Ahmed Mohamed"   icon={User}       colors={colors} />
+            <Field control={control} name="email"        label="Institutional Email" placeholder="name@university.edu"  icon={ShieldCheck} colors={colors} />
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <View style={{ flex: 1 }}>
-                <CustomInput control={control} name="phone_number" label="Phone"     placeholder="01xxxx" icon={Phone} />
+                <Field control={control} name="phone_number" label="Phone"     placeholder="01xxxx" icon={Phone} colors={colors} />
               </View>
               {selectedRole === 'student' && (
                 <View style={{ flex: 1 }}>
-                  <CustomInput control={control} name="student_id" label="ID Number" placeholder="ID#"    icon={Hash} />
+                  <Field control={control} name="student_id"  label="ID Number" placeholder="ID#"    icon={Hash}  colors={colors} />
                 </View>
               )}
             </View>
-
-            <CustomInput
+            <Field
               control={control} name="password" label="Security Key"
               placeholder="••••••••" icon={Lock} secure={!showPassword}
               rightIcon={showPassword ? Eye : EyeOff}
               onRightIconPress={() => setShowPassword(!showPassword)}
+              colors={colors}
             />
 
-            {/* ── Submit ── */}
             <TouchableOpacity
+              onPress={handleSubmit(onSubmit)} disabled={loading} activeOpacity={0.85}
               style={{
-                height: 60, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginTop: 4,
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+                paddingVertical: 14, borderRadius: 14, marginTop: 8,
                 backgroundColor: colors.tint, opacity: loading ? 0.7 : 1,
               }}
-              onPress={handleSubmit(onSubmit)}
-              disabled={loading}
-              activeOpacity={0.85}
             >
-              {loading ? (
-                <ActivityIndicator color="#000" />
-              ) : (
-                <Text style={{ fontSize: 13, fontWeight: '800', letterSpacing: 2, color: '#000' }}>
-                  PROVISION ACCOUNT
-                </Text>
-              )}
+              {loading
+                ? <ActivityIndicator color="#000" />
+                : <><UserPlus size={16} color="#000" /><Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: '#000' }}>PROVISION ACCOUNT</Text></>
+              }
             </TouchableOpacity>
+          </SectionCard>
 
-          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -209,46 +234,3 @@ export default function CreateUserPage() {
     </View>
   );
 }
-
-// ── CustomInput ──────────────────────────────────────────────────────────────
-const CustomInput = ({ control, name, label, placeholder, icon: Icon, secure, rightIcon: RightIcon, onRightIconPress }: any) => {
-  const colors = useThemeColor();
-  return (
-    <View style={{ marginBottom: 16 }}>
-      <Text style={{
-        fontSize: 9, fontWeight: '800', textTransform: 'uppercase',
-        letterSpacing: 2, marginBottom: 6, marginLeft: 4, color: colors.icon,
-      }}>
-        {label}
-      </Text>
-      <View style={{
-        flexDirection: 'row', alignItems: 'center',
-        borderRadius: 12, paddingHorizontal: 14, height: 56, borderWidth: 1,
-        backgroundColor: colors.background, borderColor: colors.border,
-      }}>
-        <Icon size={16} color={colors.icon} style={{ marginRight: 12 }} />
-        <Controller
-          control={control}
-          name={name}
-          render={({ field: { onChange, onBlur, value } }) => (
-            <TextInput
-              style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.text }}
-              placeholder={placeholder}
-              placeholderTextColor={colors.icon}
-              secureTextEntry={secure}
-              onBlur={onBlur}
-              onChangeText={onChange}
-              value={value}
-              autoCapitalize="none"
-            />
-          )}
-        />
-        {RightIcon && (
-          <TouchableOpacity onPress={onRightIconPress} style={{ padding: 4 }}>
-            <RightIcon size={16} color={colors.icon} />
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
-  );
-};

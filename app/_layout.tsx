@@ -1,9 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
+import { I18nextProvider } from 'react-i18next';
 import { ActivityIndicator, View } from 'react-native';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { ThemeProvider } from '../src/context/ThemeContext';
+import '../src/i18n';
+import i18n from '../src/i18n';
 
 function RootGuard() {
   const { token, userRole, isLoading } = useAuth();
@@ -55,10 +58,12 @@ function RootGuard() {
 
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <RootGuard />
-      </AuthProvider>
-    </ThemeProvider>
+    <I18nextProvider i18n={i18n}>
+      <ThemeProvider>
+        <AuthProvider>
+          <RootGuard />
+        </AuthProvider>
+      </ThemeProvider>
+    </I18nextProvider>
   );
 }
