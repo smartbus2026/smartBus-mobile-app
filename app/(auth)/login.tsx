@@ -1,16 +1,17 @@
-import { useState } from "react";
-import {
-  View, Text, TextInput, TouchableOpacity,
-  ActivityIndicator, KeyboardAvoidingView,
-  Platform, ScrollView, StyleSheet
-} from "react-native";
-import { router } from "expo-router";
-import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { router } from "expo-router";
+import { Bus, Eye, EyeOff, Lock, Mail } from "lucide-react-native";
+import { useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import {
+  ActivityIndicator, KeyboardAvoidingView,
+  Platform, ScrollView, StyleSheet,
+  Text, TextInput, TouchableOpacity,
+  View
+} from "react-native";
 import { z } from "zod";
-import { Bus, Mail, Lock, Eye, EyeOff } from "lucide-react-native";
-import { useAuth } from "../../src/context/AuthContext";
 import { useThemeColor } from "../../constants/theme";
+import { useAuth } from "../../src/context/AuthContext";
 import api from "../../src/services/api";
 
 const loginSchema = z.object({
@@ -30,28 +31,37 @@ export default function LoginScreen() {
   const { control, handleSubmit, formState: { errors } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
   });
+const onSubmit = async (data: LoginForm) => {
+  setLoading(true);
+  setServerError(null);
+  try {
+    const response = await api.post("/auth/login", data);
+    const { token, user } = response.data;
 
-  const onSubmit = async (data: LoginForm) => {
-    setLoading(true);
-    setServerError(null);
-    try {
-      const response = await api.post("/auth/login", data);
-      const { token, user } = response.data;
-      if (token) {
-       await login(token, user.role);
+    if (token) {
+      // وحّدي حالة الحروف الأول
+      const userRole = user?.role?.toLowerCase();
 
-        if (user.role === "admin") {
-          router.replace("/(admin)/dashboard");
-        } else {
-          router.replace("/(student)/dashboard");
-        }
+      // وبعدين ابعتي النسخة الموحّدة دي للـ AuthContext
+      await login(token, userRole);
+
+      if (userRole === "admin") {
+        router.replace("/(admin)/dashboard");
+      } else if (userRole === "driver") {
+        router.replace("/(driver)/dashboard");
+      } else if (userRole === "student") {
+        router.replace("/(student)/dashboard");
+      } else {
+        console.log("Unknown Role received from server:", user?.role);
+        setServerError("حدث خطأ في تحديد صلاحيات الحساب");
       }
-    } catch (error: any) {
-      setServerError(error.response?.data?.message || "Invalid email or password");
-    } finally {
-      setLoading(false);
     }
-  };
+  } catch (error: any) {
+    setServerError(error.response?.data?.message || "Invalid email or password");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <KeyboardAvoidingView

@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+// app/(student)/support.tsx
+import { useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, TextInput, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Alert,
+  ActivityIndicator, Alert, ScrollView, Text,
+  TextInput, TouchableOpacity, View,
 } from 'react-native';
-import {
-  HelpCircle, MessageCircle, Send, Check, ChevronDown,
-} from 'lucide-react-native';
+import { Check, ChevronDown, HelpCircle, MessageCircle, Send } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { Colors } from '../../constants/theme';
+import { useTheme } from '../../src/context/ThemeContext';
 import Api from '../../src/services/api';
-import { useThemeColor } from '../../constants/theme';
 import TopBar from '../../src/components/TopBar';
 import { BOTTOM_BAR_HEIGHT } from '../../src/hooks/useBottomBarHeight';
 
@@ -27,15 +27,42 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; border: string }
 };
 
 interface Ticket {
-  _id: string;
-  subject: string;
-  description: string;
-  status: 'open' | 'pending' | 'resolved';
-  createdAt: string;
+  _id: string; subject: string;
+  description: string; status: 'open' | 'pending' | 'resolved'; createdAt: string;
 }
 
+// ─── Section Card ─────────────────────────────────────────────────────────────
+const SectionCard: React.FC<{
+  icon: React.ReactNode; title: string; subtitle: string;
+  children: React.ReactNode; colors: any;
+}> = ({ icon, title, subtitle, children, colors }) => (
+  <View style={{
+    borderRadius: 24, borderWidth: 1, padding: 24, marginBottom: 16,
+    backgroundColor: colors.card, borderColor: colors.border,
+  }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 24 }}>
+      <View style={{
+        width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
+        backgroundColor: `${colors.tint}1A`, borderWidth: 1, borderColor: `${colors.tint}33`,
+      }}>
+        {icon}
+      </View>
+      <View>
+        <Text style={{ fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>
+          {title}
+        </Text>
+        <Text style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, color: colors.icon, marginTop: 2 }}>
+          {subtitle}
+        </Text>
+      </View>
+    </View>
+    {children}
+  </View>
+);
+
 export default function SupportPage() {
-  const colors = useThemeColor();
+  const { theme } = useTheme();
+  const colors = Colors[theme];
   const router = useRouter();
 
   const [openFaq, setOpenFaq]     = useState<number | null>(0);
@@ -63,196 +90,198 @@ export default function SupportPage() {
       await Api.post('/support', { subject, description: desc });
       setSubmitted(true);
       fetchTickets();
-    } catch (err) {
+    } catch {
       Alert.alert('Error', 'Failed to submit ticket');
     } finally {
       setLoading(false);
     }
   };
 
-  const inputBg = { backgroundColor: colors.background === '#f8f9fa' ? '#f0f1f3' : '#262a33' };
-
   return (
-    <View style={[s.root, { backgroundColor: colors.background }]}>
-
-      <TopBar
-        title="Support"
-        showMenu
-        showSettings
-        onSettingsPress={() => router.push('/(student)/settings' as any)}
-      />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <TopBar title="Support" showMenu showSettings onSettingsPress={() => router.push('/(student)/settings' as any)} />
 
       <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={[s.scroll, { paddingBottom: BOTTOM_BAR_HEIGHT + 16 }]}
+        contentContainerStyle={{ padding: 20, paddingBottom: BOTTOM_BAR_HEIGHT + 16 }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Page Header */}
+        <View style={{ marginBottom: 24 }}>
+          <Text style={{ fontSize: 22, fontWeight: '900', textTransform: 'uppercase', letterSpacing: -0.5, color: colors.text }}>
+            HELP &{' '}<Text style={{ color: colors.tint }}>SUPPORT</Text>
+          </Text>
+          <Text style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginTop: 2 }}>
+            FAQ & TICKET SYSTEM
+          </Text>
+        </View>
 
         {/* ── FAQ ── */}
-        <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={s.cardHeader}>
-            <View style={[s.iconBox, { backgroundColor: `${colors.tint}1A` }]}>
-              <HelpCircle size={16} color={colors.tint} />
-            </View>
-            <Text style={[s.cardTitle, { color: colors.text }]}>Frequently Asked Questions</Text>
-          </View>
-
+        <SectionCard icon={<HelpCircle size={22} color={colors.tint} />} title="FAQ" subtitle="Common Questions" colors={colors}>
           {FAQS.map((f, i) => (
-            <View key={i} style={[s.faqItem, { borderTopColor: colors.border }]}>
+            <View key={i} style={{ borderTopWidth: i === 0 ? 0 : 1, borderTopColor: colors.border }}>
               <TouchableOpacity
-                style={s.faqQuestion}
-                onPress={() => setOpenFaq(openFaq === i ? null : i)}
                 activeOpacity={0.7}
+                onPress={() => setOpenFaq(openFaq === i ? null : i)}
+                style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14 }}
               >
-                <Text style={[s.faqQ, { color: colors.text }]}>{f.q}</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', flex: 1, paddingRight: 10, lineHeight: 18, color: colors.text }}>
+                  {f.q}
+                </Text>
                 <ChevronDown
-                  size={13}
-                  color={colors.icon}
+                  size={13} color={colors.icon}
                   style={{ transform: [{ rotate: openFaq === i ? '180deg' : '0deg' }] }}
                 />
               </TouchableOpacity>
               {openFaq === i && (
-                <Text style={[s.faqA, { color: colors.icon }]}>{f.a}</Text>
+                <Text style={{ fontSize: 12, lineHeight: 18, paddingBottom: 12, color: colors.icon }}>
+                  {f.a}
+                </Text>
               )}
             </View>
           ))}
-        </View>
+        </SectionCard>
 
         {/* ── Submit Ticket ── */}
-        <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={s.cardHeader}>
-            <View style={[s.iconBox, { backgroundColor: `${colors.tint}1A` }]}>
-              <MessageCircle size={16} color={colors.tint} />
-            </View>
-            <Text style={[s.cardTitle, { color: colors.text }]}>Submit a Ticket</Text>
-          </View>
-
+        <SectionCard icon={<MessageCircle size={22} color={colors.tint} />} title="Submit a Ticket" subtitle="Get Help from Support" colors={colors}>
           {submitted ? (
-            <View style={s.successWrap}>
-              <View style={s.successIcon}>
+            <View style={{ alignItems: 'center', paddingVertical: 24 }}>
+              <View style={{
+                width: 64, height: 64, borderRadius: 20, marginBottom: 16,
+                alignItems: 'center', justifyContent: 'center',
+                backgroundColor: 'rgba(34,197,94,0.1)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.2)',
+              }}>
                 <Check size={28} color="#22c55e" />
               </View>
-              <Text style={[s.successTitle, { color: colors.text }]}>Ticket Submitted!</Text>
-              <Text style={[s.successSub, { color: colors.icon }]}>We'll respond within 24 hours.</Text>
+              <Text style={{ fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text, marginBottom: 6 }}>
+                Ticket Submitted!
+              </Text>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.icon, marginBottom: 20 }}>
+                We'll respond within 24 hours.
+              </Text>
               <TouchableOpacity
-                onPress={() => { setSubmitted(false); setSubject(''); setDesc(''); }}
                 activeOpacity={0.7}
+                onPress={() => { setSubmitted(false); setSubject(''); setDesc(''); }}
+                style={{
+                  borderWidth: 1, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10,
+                  backgroundColor: colors.background, borderColor: colors.border,
+                }}
               >
-                <Text style={[s.successLink, { color: colors.tint }]}>Send another report</Text>
+                <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1.5, color: colors.text }}>
+                  Send Another Report
+                </Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={s.formWrap}>
-              <View style={s.fieldWrap}>
-                <Text style={[s.label, { color: colors.icon }]}>SUBJECT</Text>
-                <TextInput
-                  style={[s.input, inputBg, { borderColor: colors.border, color: colors.text }]}
-                  placeholder="What's the problem?"
-                  placeholderTextColor={colors.icon}
-                  value={subject}
-                  onChangeText={setSubject}
-                />
+            <View style={{ gap: 16 }}>
+              {/* Subject */}
+              <View>
+                <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginBottom: 8 }}>
+                  SUBJECT
+                </Text>
+                <View style={{
+                  borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, height: 52,
+                  backgroundColor: colors.background, borderColor: colors.border,
+                }}>
+                  <TextInput
+                    style={{ flex: 1, fontSize: 14, fontWeight: '700', color: colors.text, height: '100%' }}
+                    placeholder="What's the problem?"
+                    placeholderTextColor={colors.icon}
+                    value={subject}
+                    onChangeText={setSubject}
+                  />
+                </View>
               </View>
-              <View style={s.fieldWrap}>
-                <Text style={[s.label, { color: colors.icon }]}>DESCRIPTION</Text>
-                <TextInput
-                  style={[s.input, s.textArea, inputBg, { borderColor: colors.border, color: colors.text }]}
-                  placeholder="Describe the issue in detail..."
-                  placeholderTextColor={colors.icon}
-                  value={desc}
-                  onChangeText={setDesc}
-                  multiline
-                  numberOfLines={4}
-                  textAlignVertical="top"
-                />
+
+              {/* Description */}
+              <View>
+                <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginBottom: 8 }}>
+                  DESCRIPTION
+                </Text>
+                <View style={{
+                  borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12,
+                  backgroundColor: colors.background, borderColor: colors.border,
+                }}>
+                  <TextInput
+                    style={{ fontSize: 14, fontWeight: '600', color: colors.text, height: 100, textAlignVertical: 'top' }}
+                    placeholder="Describe the issue in detail..."
+                    placeholderTextColor={colors.icon}
+                    value={desc}
+                    onChangeText={setDesc}
+                    multiline
+                    numberOfLines={4}
+                  />
+                </View>
               </View>
+
+              {/* Submit Btn */}
               <TouchableOpacity
-                style={[s.submitBtn, { backgroundColor: colors.tint }, (!subject.trim() || loading) && s.submitDisabled]}
                 onPress={handleSubmit}
                 disabled={!subject.trim() || loading}
                 activeOpacity={0.85}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  paddingVertical: 14, borderRadius: 14,
+                  backgroundColor: colors.tint,
+                  opacity: (!subject.trim() || loading) ? 0.5 : 1,
+                }}
               >
                 {loading
                   ? <ActivityIndicator color="#000" />
                   : <>
                       <Send size={15} color="#000" />
-                      <Text style={s.submitText}>Submit Ticket</Text>
+                      <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: '#000' }}>
+                        SUBMIT TICKET
+                      </Text>
                     </>
                 }
               </TouchableOpacity>
             </View>
           )}
-        </View>
+        </SectionCard>
 
         {/* ── Previous Tickets ── */}
-        <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[s.sectionTitle, { color: colors.text }]}>PREVIOUS TICKETS</Text>
+        <SectionCard icon={<HelpCircle size={22} color={colors.icon} />} title="Previous Tickets" subtitle="Your Support History" colors={colors}>
           {tickets.length === 0 ? (
-            <Text style={[s.emptyText, { color: colors.icon }]}>You haven't submitted any tickets yet.</Text>
+            <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+              <Text style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, textAlign: 'center' }}>
+                No tickets submitted yet
+              </Text>
+            </View>
           ) : (
             tickets.map(t => {
               const sc = STATUS_COLORS[t.status] || STATUS_COLORS.pending;
               return (
-                <View key={t._id} style={[s.ticketRow, inputBg, { borderColor: colors.border }]}>
-                  <View style={s.ticketLeft}>
-                    <Text style={[s.ticketSubject, { color: colors.text }]} numberOfLines={1}>
+                <View
+                  key={t._id}
+                  style={{
+                    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+                    borderWidth: 1, borderRadius: 14, padding: 14, marginBottom: 8,
+                    backgroundColor: colors.background, borderColor: colors.border,
+                  }}
+                >
+                  <View style={{ flex: 1, marginRight: 10 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 3 }} numberOfLines={1}>
                       {t.subject}
                     </Text>
-                    <Text style={[s.ticketMeta, { color: colors.icon }]}>
+                    <Text style={{ fontSize: 10, fontWeight: '600', color: colors.icon }}>
                       {t._id.slice(-6).toUpperCase()} • {new Date(t.createdAt).toLocaleDateString()}
                     </Text>
                   </View>
-                  <View style={[s.statusBadge, { backgroundColor: sc.bg, borderColor: sc.border }]}>
-                    <Text style={[s.statusText, { color: sc.text }]}>{t.status}</Text>
+                  <View style={{
+                    borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
+                    backgroundColor: sc.bg, borderColor: sc.border,
+                  }}>
+                    <Text style={{ fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: sc.text }}>
+                      {t.status}
+                    </Text>
                   </View>
                 </View>
               );
             })
           )}
-        </View>
+        </SectionCard>
 
       </ScrollView>
     </View>
   );
 }
-
-const s = StyleSheet.create({
-  root:           { flex: 1 },
-  scroll:         { padding: 20, paddingTop: 16, gap: 14 },
-
-  card:           { borderWidth: 1, borderRadius: 20, padding: 20 },
-  cardHeader:     { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
-  iconBox:        { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  cardTitle:      { fontSize: 13, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
-
-  faqItem:        { borderTopWidth: 1, paddingVertical: 4 },
-  faqQuestion:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 },
-  faqQ:           { fontSize: 13, fontWeight: '700', flex: 1, paddingRight: 10, lineHeight: 18 },
-  faqA:           { fontSize: 12, lineHeight: 18, paddingBottom: 10 },
-
-  successWrap:    { alignItems: 'center', paddingVertical: 24 },
-  successIcon:    { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(34,197,94,0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  successTitle:   { fontSize: 15, fontWeight: '700', marginBottom: 4 },
-  successSub:     { fontSize: 11, marginBottom: 16 },
-  successLink:    { fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },
-
-  formWrap:       { gap: 14 },
-  fieldWrap:      { gap: 6 },
-  label:          { fontSize: 10, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' },
-  input:          { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 13 },
-  textArea:       { height: 100, paddingTop: 12 },
-
-  submitBtn:      { borderRadius: 14, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  submitDisabled: { opacity: 0.5 },
-  submitText:     { color: '#000', fontWeight: '700', fontSize: 13 },
-
-  sectionTitle:   { fontSize: 11, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 14 },
-  emptyText:      { textAlign: 'center', fontSize: 12, paddingVertical: 24, opacity: 0.5 },
-
-  ticketRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 8 },
-  ticketLeft:     { flex: 1, marginRight: 10 },
-  ticketSubject:  { fontSize: 13, fontWeight: '700', marginBottom: 3 },
-  ticketMeta:     { fontSize: 10, fontWeight: '500' },
-  statusBadge:    { borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  statusText:     { fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
-});

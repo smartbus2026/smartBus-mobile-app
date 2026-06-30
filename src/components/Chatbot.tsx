@@ -1,12 +1,17 @@
-import { useState, useRef, useEffect } from "react";
+import { Bot, Send, X } from "lucide-react-native";
+import { useEffect, useRef, useState } from "react";
 import {
-  View, Text, TextInput, TouchableOpacity,
-  StyleSheet, Modal, ScrollView, KeyboardAvoidingView,
-  Platform, ActivityIndicator, Animated
+  ActivityIndicator, Animated,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text, TextInput, TouchableOpacity,
+  View
 } from "react-native";
-import { X, Send, Bot } from "lucide-react-native";
-import api from "../services/api";
 import { useThemeColor } from "../../constants/theme";
+import api from "../services/api";
 
 interface Message {
   role: "user" | "assistant";
@@ -22,7 +27,6 @@ export default function Chatbot() {
   const scrollRef = useRef<ScrollView>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Pulse animation للزرار
   useEffect(() => {
     if (!isOpen) {
       Animated.loop(
@@ -143,7 +147,7 @@ export default function Chatbot() {
                     styles.msgBubble,
                     msg.role === "user"
                       ? styles.bubbleUser
-                      : [styles.bubbleBot, { backgroundColor: colors.card2 || "#262a33", borderColor: colors.border }]
+                      : [styles.bubbleBot, { backgroundColor: "#262a33", borderColor: colors.border }]
                   ]}>
                     <Text style={[
                       styles.msgText,
@@ -157,7 +161,7 @@ export default function Chatbot() {
 
               {loading && (
                 <View style={styles.msgRowBot}>
-                  <View style={[styles.msgBubble, styles.bubbleBot, { backgroundColor: colors.card2 || "#262a33" }]}>
+                  <View style={[styles.msgBubble, styles.bubbleBot, { backgroundColor: "#262a33" }]}>
                     <View style={styles.typingDots}>
                       <ActivityIndicator size="small" color="#f7a01b" />
                       <Text style={[styles.typingText, { color: colors.icon }]}>AI Calculating...</Text>
@@ -169,7 +173,7 @@ export default function Chatbot() {
 
             {/* Input */}
             <View style={[styles.inputArea, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
-              <View style={[styles.inputWrapper, { backgroundColor: colors.card2 || "#262a33", borderColor: colors.border }]}>
+              <View style={[styles.inputWrapper, { backgroundColor: "#262a33", borderColor: colors.border }]}>
                 <TextInput
                   style={[styles.input, { color: colors.text }]}
                   placeholder="Type your query..."

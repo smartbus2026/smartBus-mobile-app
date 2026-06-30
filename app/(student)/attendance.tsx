@@ -10,12 +10,13 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 import Api from '../../src/services/api';
 import { useThemeColor } from "../../constants/theme";
 import TopBar from '../../src/components/TopBar';
 
 const { width } = Dimensions.get('window');
-const cardWidth = (width - 40 - 12) / 2; // 40 for horizontal padding, 12 for gap
+const cardWidth = (width - 40 - 12) / 2;
 
 interface BookingRecord {
   _id: string;
@@ -31,6 +32,7 @@ interface BookingRecord {
 export default function AttendanceScreen() {
   const router = useRouter();
   const colors = useThemeColor();
+  const { t } = useTranslation();
   const [bookings, setBookings] = useState<BookingRecord[]>([]);
   const [settings, setSettings] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,7 +50,7 @@ export default function AttendanceScreen() {
         )
       );
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to update attendance");
+      alert(err.response?.data?.message || t('failed_update_attendance'));
     } finally {
       setLoadingId(null);
     }
@@ -101,7 +103,6 @@ export default function AttendanceScreen() {
 
     if (now < tripStartTime) return { isStarted: false, isExpired: false };
 
-    // Expired after 120 minutes
     const expiredTime = new Date(tripStartTime.getTime() + 120 * 60000);
     if (now > expiredTime) return { isStarted: true, isExpired: true };
 
@@ -111,9 +112,9 @@ export default function AttendanceScreen() {
   const allBookings = bookings.filter(b => b.status !== "cancelled");
 
   const present = allBookings.filter(b => b.attendanceStatus === "completed").length;
-  const missed = allBookings.filter(b => b.attendanceStatus === "missed").length;
-  const total = present + missed;
-  const pct = total > 0 ? Math.round((present / total) * 100) : 0;
+  const missed  = allBookings.filter(b => b.attendanceStatus === "missed").length;
+  const total   = present + missed;
+  const pct     = total > 0 ? Math.round((present / total) * 100) : 0;
 
   const groupedByDate: Record<string, BookingRecord[]> = {};
   allBookings.forEach(b => {
@@ -130,16 +131,16 @@ export default function AttendanceScreen() {
     return (
       <View style={[s.loadWrap, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.tint} />
-        <Text style={[s.loadText, { color: colors.icon }]}>LOADING ATTENDANCE...</Text>
+        <Text style={[s.loadText, { color: colors.icon }]}>{t('loading_attendance').toUpperCase()}</Text>
       </View>
     );
   }
 
   return (
     <SafeAreaView style={[s.root, { backgroundColor: colors.background }]} edges={['bottom', 'left', 'right']}>
-      
+
       <TopBar
-        title="My Attendance"
+        title={t('nav_myAttendance')}
         showMenu
         showSettings
         onSettingsPress={() => router.push('/(student)/settings' as any)}
@@ -152,17 +153,17 @@ export default function AttendanceScreen() {
       >
         {/* Header */}
         <View style={s.header}>
-          <Text style={[s.headerTitle, { color: colors.text }]}>MY ATTENDANCE</Text>
-          <Text style={[s.headerSub, { color: colors.icon }]}>YOUR TRIP RECORD</Text>
+          <Text style={[s.headerTitle, { color: colors.text }]}>{t('my_attendance').toUpperCase()}</Text>
+          <Text style={[s.headerSub, { color: colors.icon }]}>{t('your_trip_record').toUpperCase()}</Text>
         </View>
 
         {/* Stats Grid (2x2) */}
         <View style={s.statsRow}>
           {[
-            { l: "TOTAL TRIPS", v: String(total),  color: colors.icon },
-            { l: "PRESENT",     v: String(present), color: "#22c55e" },
-            { l: "MISSED",      v: String(missed),  color: "#ef4444" },
-            { l: "RATE",        v: `${pct}%`,       color: pct >= 75 ? "#22c55e" : "#ef4444" },
+            { l: t('total_trips').toUpperCase(), v: String(total),  color: colors.icon },
+            { l: t('present').toUpperCase(),     v: String(present), color: "#22c55e" },
+            { l: t('missed').toUpperCase(),       v: String(missed),  color: "#ef4444" },
+            { l: t('rate').toUpperCase(),         v: `${pct}%`,       color: pct >= 75 ? "#22c55e" : "#ef4444" },
           ].map(item => (
             <View key={item.l} style={[s.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[s.statLabel, { color: colors.icon }]}>{item.l}</Text>
@@ -174,7 +175,7 @@ export default function AttendanceScreen() {
         {/* Progress Card */}
         <View style={[s.progressCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={s.progressHeader}>
-            <Text style={[s.progressLabel, { color: colors.icon }]}>ATTENDANCE RATE</Text>
+            <Text style={[s.progressLabel, { color: colors.icon }]}>{t('attendance_rate').toUpperCase()}</Text>
             <Text style={[s.progressPct, { color: colors.tint }]}>{pct}%</Text>
           </View>
           <View style={[s.progressTrack, { backgroundColor: colors.background }]}>
@@ -186,20 +187,20 @@ export default function AttendanceScreen() {
             />
           </View>
           <Text style={[s.progressHint, { color: colors.icon }]}>
-            {pct >= 75 ? "✓ GOOD ATTENDANCE KEEP IT UP!" : "⚠ YOUR ATTENDANCE IS BELOW 75%"}
+            {pct >= 75 ? t('good_attendance') : t('low_attendance_warning')}
           </Text>
         </View>
 
         {/* Trip Log */}
         <View style={[s.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[s.sectionTitle, { color: colors.text }]}>TRIP LOG</Text>
+          <Text style={[s.sectionTitle, { color: colors.text }]}>{t('trip_log').toUpperCase()}</Text>
 
           {sortedDates.length === 0 ? (
-            <Text style={[s.emptyText, { color: colors.icon }]}>NO TRIP HISTORY FOUND</Text>
+            <Text style={[s.emptyText, { color: colors.icon }]}>{t('no_trip_history').toUpperCase()}</Text>
           ) : (
             sortedDates.map(dateKey => {
               const presentCount = groupedByDate[dateKey].filter(b => b.attendanceStatus === "completed").length;
-              const totalCount = groupedByDate[dateKey].length;
+              const totalCount   = groupedByDate[dateKey].length;
 
               return (
                 <View key={dateKey} style={s.dateGroup}>
@@ -208,7 +209,7 @@ export default function AttendanceScreen() {
                     <Text style={[s.dateText, { color: colors.tint }]}>{dateKey}</Text>
                     <View style={[s.dateLine, { backgroundColor: colors.border }]} />
                     <Text style={[s.dateCount, { color: colors.icon }]}>
-                      {presentCount}/{totalCount} PRESENT
+                      {t('present_count', { present: presentCount, total: totalCount }).toUpperCase()}
                     </Text>
                   </View>
 
@@ -242,7 +243,7 @@ export default function AttendanceScreen() {
                          b.attendanceStatus !== "missed" ? (
                           isExpired ? (
                             <View style={[s.badge, s.badgeRed]}>
-                              <Text style={[s.badgeText, { color: "#ef4444" }]}>EXPIRED</Text>
+                              <Text style={[s.badgeText, { color: "#ef4444" }]}>{t('expired').toUpperCase()}</Text>
                             </View>
                           ) : (
                             <View style={s.actionRow}>
@@ -256,7 +257,7 @@ export default function AttendanceScreen() {
                                 ]}
                               >
                                 <Text style={[s.actionBtnText, { color: "#22c55e" }]}>
-                                  {loadingId === b._id ? "..." : "✓ BOARDED"}
+                                  {loadingId === b._id ? "..." : t('boarded').toUpperCase()}
                                 </Text>
                               </TouchableOpacity>
                               <TouchableOpacity
@@ -269,7 +270,7 @@ export default function AttendanceScreen() {
                                 ]}
                               >
                                 <Text style={[s.actionBtnText, { color: "#ef4444" }]}>
-                                  {loadingId === b._id ? "..." : "✗ MISSED"}
+                                  {loadingId === b._id ? "..." : t('missed_btn').toUpperCase()}
                                 </Text>
                               </TouchableOpacity>
                             </View>
@@ -289,8 +290,8 @@ export default function AttendanceScreen() {
                                 colors.tint
                               },
                             ]}>
-                              {b.attendanceStatus === "completed" ? "PRESENT" :
-                               b.attendanceStatus === "missed"    ? "MISSED"  :
+                              {b.attendanceStatus === "completed" ? t('attendance_present').toUpperCase() :
+                               b.attendanceStatus === "missed"    ? t('missed').toUpperCase()            :
                                b.status.toUpperCase()}
                             </Text>
                           </View>

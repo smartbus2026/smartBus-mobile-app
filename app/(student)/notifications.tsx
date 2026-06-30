@@ -1,15 +1,18 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, ActivityIndicator, RefreshControl,
-} from 'react-native';
+// app/(student)/notifications.tsx
 import { useRouter } from 'expo-router';
 import { Bell, Check } from 'lucide-react-native';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator, RefreshControl, ScrollView,
+  Text, TouchableOpacity, View,
+} from 'react-native';
+import { Colors } from '../../constants/theme';
+import { useTheme } from '../../src/context/ThemeContext';
 import Api from '../../src/services/api';
-import { useThemeColor } from '../../constants/theme';
-import TopBar from '../../src/components/TopBar';
 import socket from '../../src/services/socket';
+import TopBar from '../../src/components/TopBar';
 
+// ─── Types ─────────────────────────────────────────────────────────────────────
 interface Notification {
   _id: string;
   title: string;
@@ -19,9 +22,116 @@ interface Notification {
   createdAt: string;
 }
 
+// ─── Section Card ─────────────────────────────────────────────────────────────
+const SectionCard: React.FC<{
+  icon: React.ReactNode; title: string; subtitle: string;
+  children: React.ReactNode; colors: any;
+}> = ({ icon, title, subtitle, children, colors }) => (
+  <View style={{
+    borderRadius: 24, borderWidth: 1, padding: 24, marginBottom: 16,
+    backgroundColor: colors.card, borderColor: colors.border,
+  }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 24 }}>
+      <View style={{
+        width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
+        backgroundColor: `${colors.tint}1A`, borderWidth: 1, borderColor: `${colors.tint}33`,
+      }}>
+        {icon}
+      </View>
+      <View>
+        <Text style={{ fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>
+          {title}
+        </Text>
+        <Text style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, color: colors.icon, marginTop: 2 }}>
+          {subtitle}
+        </Text>
+      </View>
+    </View>
+    {children}
+  </View>
+);
+
+// ─── Notification Card ────────────────────────────────────────────────────────
+const NotifCard: React.FC<{
+  n: Notification; colors: any; onPress: () => void;
+}> = ({ n, colors, onPress }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    activeOpacity={0.85}
+    style={{
+      flexDirection: 'row', alignItems: 'flex-start', gap: 14,
+      borderWidth: 1, borderRadius: 20, padding: 16, marginBottom: 10,
+      backgroundColor: colors.card, borderColor: colors.border,
+      opacity: n.read ? 0.65 : 1,
+    }}
+  >
+    {/* Icon */}
+    <View style={{
+      width: 44, height: 44, borderRadius: 14, borderWidth: 1,
+      alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      backgroundColor: n.read ? colors.background : `${colors.tint}1A`,
+      borderColor:     n.read ? colors.border      : `${colors.tint}33`,
+    }}>
+      <Bell size={20} color={n.read ? colors.icon : colors.tint} />
+    </View>
+
+    {/* Content */}
+    <View style={{ flex: 1, gap: 4 }}>
+      {/* Title row */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <Text style={{ fontSize: 13, fontWeight: '700', flex: 1, color: n.read ? colors.icon : colors.text }} numberOfLines={1}>
+          {n.title}
+        </Text>
+        <View style={{ borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, backgroundColor: colors.background }}>
+          <Text style={{ fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, color: colors.icon }}>
+            {n.type}
+          </Text>
+        </View>
+      </View>
+
+      {/* Message */}
+      <Text style={{ fontSize: 12, lineHeight: 18, fontWeight: '400', color: colors.icon }} numberOfLines={2}>
+        {n.message}
+      </Text>
+
+      {/* Footer */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+        <Text style={{ fontSize: 10, fontWeight: '600', color: colors.icon }}>
+          {new Date(n.createdAt).toLocaleString('en-GB', {
+            day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+          })}
+        </Text>
+        <View style={{
+          borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3,
+          ...(n.read
+            ? { backgroundColor: colors.background }
+            : { backgroundColor: 'rgba(34,197,94,0.08)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.2)' }),
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            {n.read && <Check size={9} color={colors.icon} />}
+            <Text style={{ fontSize: 9, fontWeight: '700', color: n.read ? colors.icon : '#22c55e' }}>
+              {n.read ? 'Read' : 'Tap to mark read'}
+            </Text>
+          </View>
+        </View>
+      </View>
+    </View>
+
+    {/* Unread dot */}
+    {!n.read && (
+      <View style={{
+        width: 8, height: 8, borderRadius: 4, marginTop: 4, flexShrink: 0,
+        backgroundColor: colors.tint,
+      }} />
+    )}
+  </TouchableOpacity>
+);
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function NotificationsScreen() {
-  const router  = useRouter();
-  const colors  = useThemeColor();
+  const router = useRouter();
+  const { theme } = useTheme();
+  const colors = Colors[theme];
 
   const [notifs, setNotifs]         = useState<Notification[]>([]);
   const [isLoading, setIsLoading]   = useState(true);
@@ -41,19 +151,17 @@ export default function NotificationsScreen() {
 
   useEffect(() => { fetchNotifs(); }, [fetchNotifs]);
 
-  // Real-time socket
   useEffect(() => {
     const handleNewNotif = (notif: any) => {
       setNotifs(prev => [{
-        _id:       notif._id || Date.now().toString(),
-        title:     notif.title   || 'New Alert',
-        message:   notif.message || '',
-        type:      notif.type    || 'general',
+        _id:       notif._id       || Date.now().toString(),
+        title:     notif.title     || 'New Alert',
+        message:   notif.message   || '',
+        type:      notif.type      || 'general',
         read:      false,
         createdAt: notif.createdAt || new Date().toISOString(),
       }, ...prev]);
     };
-
     socket.on('newNotification',  handleNewNotif);
     socket.on('new_notification', handleNewNotif);
     return () => {
@@ -65,12 +173,10 @@ export default function NotificationsScreen() {
   const onRefresh = () => { setRefreshing(true); fetchNotifs(); };
 
   const handleMarkRead = async (id: string) => {
-    // Optimistic update
     setNotifs(prev => prev.map(n => n._id === id ? { ...n, read: true } : n));
     try {
       await Api.put(`/notifications/${id}/read`);
     } catch {
-      // Revert on failure
       setNotifs(prev => prev.map(n => n._id === id ? { ...n, read: false } : n));
     }
   };
@@ -90,16 +196,20 @@ export default function NotificationsScreen() {
 
   if (isLoading) {
     return (
-      <View style={[s.center, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.tint} />
-        <Text style={[s.loadingTxt, { color: colors.icon }]}>Loading Notifications...</Text>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <TopBar title="Notifications" showMenu showSettings onSettingsPress={() => router.push('/(student)/settings' as any)} />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 }}>
+          <ActivityIndicator size="large" color={colors.tint} />
+          <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 3, color: colors.icon }}>
+            LOADING...
+          </Text>
+        </View>
       </View>
     );
   }
 
   return (
-    <View style={[s.root, { backgroundColor: colors.background }]}>
-
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <TopBar
         title="Notifications"
         showMenu
@@ -108,148 +218,88 @@ export default function NotificationsScreen() {
       />
 
       <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={s.scroll}
+        contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.tint} />
         }
       >
+        {/* Header */}
+        <View style={{ marginBottom: 24 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View>
+              <Text style={{ fontSize: 22, fontWeight: '900', textTransform: 'uppercase', letterSpacing: -0.5, color: colors.text }}>
+                YOUR{' '}
+                <Text style={{ color: colors.tint }}>ALERTS</Text>
+              </Text>
+              <Text style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginTop: 2 }}>
+                NOTIFICATIONS & UPDATES
+              </Text>
+            </View>
+            {unreadCount > 0 && (
+              <TouchableOpacity
+                onPress={handleReadAll}
+                activeOpacity={0.8}
+                style={{
+                  borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 7,
+                  backgroundColor: `${colors.tint}1A`, borderColor: `${colors.tint}33`,
+                }}
+              >
+                <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: colors.tint }}>
+                  Mark All Read
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
-        {/* Header Row */}
-        <View style={s.headerRow}>
-          <Text style={[s.headerTitle, { color: colors.text }]}>Your Notifications</Text>
+          {/* Unread badge */}
           {unreadCount > 0 && (
-            <TouchableOpacity
-              style={[s.readAllBtn, { backgroundColor: `${colors.tint}1A`, borderColor: `${colors.tint}33` }]}
-              onPress={handleReadAll}
-              activeOpacity={0.8}
-            >
-              <Text style={[s.readAllTxt, { color: colors.tint }]}>Mark All Read</Text>
-            </TouchableOpacity>
+            <View style={{
+              alignSelf: 'flex-start', marginTop: 12, borderWidth: 1, borderRadius: 20,
+              paddingHorizontal: 10, paddingVertical: 4,
+              backgroundColor: `${colors.tint}1A`, borderColor: `${colors.tint}4D`,
+            }}>
+              <Text style={{ fontSize: 9, fontWeight: '700', letterSpacing: 1, color: colors.tint }}>
+                {unreadCount} UNREAD
+              </Text>
+            </View>
           )}
         </View>
 
-        {/* Unread Badge */}
-        {unreadCount > 0 && (
-          <View style={[s.unreadBadge, { backgroundColor: `${colors.tint}1A`, borderColor: `${colors.tint}4D` }]}>
-            <Text style={[s.unreadTxt, { color: colors.tint }]}>{unreadCount} UNREAD</Text>
-          </View>
-        )}
-
         {/* Empty State */}
         {notifs.length === 0 ? (
-          <View style={s.emptyWrap}>
-            <Bell size={48} color={colors.icon} style={{ opacity: 0.3, marginBottom: 16 }} />
-            <Text style={[s.emptyTitle, { color: colors.text }]}>No Notifications Yet</Text>
-            <Text style={[s.emptyDesc, { color: colors.icon }]}>You're all caught up! Check back later.</Text>
-          </View>
+          <SectionCard
+            icon={<Bell size={22} color={colors.icon} />}
+            title="No Notifications"
+            subtitle="You're all caught up"
+            colors={colors}
+          >
+            <View style={{ alignItems: 'center', paddingVertical: 24 }}>
+              <Bell size={48} color={colors.icon} style={{ opacity: 0.3, marginBottom: 16 }} />
+              <Text style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, textAlign: 'center' }}>
+                Check back later for updates
+              </Text>
+            </View>
+          </SectionCard>
         ) : (
-          notifs.map(n => (
-            <TouchableOpacity
-              key={n._id}
-              style={[
-                s.card,
-                { backgroundColor: colors.card, borderColor: colors.border },
-                n.read && s.cardRead,
-              ]}
-              onPress={() => !n.read && handleMarkRead(n._id)}
-              activeOpacity={0.85}
-            >
-              {/* Icon */}
-              <View style={[
-                s.iconWrap,
-                n.read
-                  ? { backgroundColor: colors.background, borderColor: colors.border }
-                  : { backgroundColor: `${colors.tint}1A`, borderColor: `${colors.tint}33` },
-              ]}>
-                <Bell size={20} color={n.read ? colors.icon : colors.tint} />
-              </View>
-
-              {/* Content */}
-              <View style={s.content}>
-                <View style={s.titleRow}>
-                  <Text style={[s.title, { color: n.read ? colors.icon : colors.text }]} numberOfLines={1}>
-                    {n.title}
-                  </Text>
-                  <View style={[s.typeBadge, { backgroundColor: colors.background }]}>
-                    <Text style={[s.typeTxt, { color: colors.icon }]}>{n.type}</Text>
-                  </View>
-                </View>
-
-                <Text style={[s.message, { color: colors.icon }]} numberOfLines={2}>
-                  {n.message}
-                </Text>
-
-                <View style={s.footer}>
-                  <Text style={[s.time, { color: colors.icon }]}>
-                    {new Date(n.createdAt).toLocaleString('en-GB', {
-                      day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
-                    })}
-                  </Text>
-                  <View style={[
-                    s.statusBadge,
-                    n.read
-                      ? { backgroundColor: colors.background }
-                      : { backgroundColor: 'rgba(34,197,94,0.08)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.2)' },
-                  ]}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      {n.read && <Check size={9} color={colors.icon} />}
-                      <Text style={[s.statusTxt, { color: n.read ? colors.icon : '#22c55e' }]}>
-                        {n.read ? 'Read' : 'Tap to mark read'}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              {/* Unread dot */}
-              {!n.read && <View style={[s.dot, { backgroundColor: colors.tint }]} />}
-            </TouchableOpacity>
-          ))
+          <SectionCard
+            icon={<Bell size={22} color={colors.tint} />}
+            title="Notifications"
+            subtitle={`${notifs.length} total · ${unreadCount} unread`}
+            colors={colors}
+          >
+            {notifs.map(n => (
+              <NotifCard
+                key={n._id}
+                n={n}
+                colors={colors}
+                onPress={() => !n.read && handleMarkRead(n._id)}
+              />
+            ))}
+          </SectionCard>
         )}
 
-        <View style={{ height: 100 }} />
       </ScrollView>
     </View>
   );
 }
-
-const s = StyleSheet.create({
-  root:        { flex: 1 },
-  scroll:      { padding: 20, paddingTop: 16 },
-  center:      { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadingTxt:  { fontSize: 11, fontWeight: '700', letterSpacing: 2 },
-
-  headerRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  headerTitle: { fontSize: 15, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
-  readAllBtn:  { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 7 },
-  readAllTxt:  { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
-
-  unreadBadge: { alignSelf: 'flex-start', marginBottom: 16, borderWidth: 1, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-  unreadTxt:   { fontSize: 9, fontWeight: '700', letterSpacing: 1 },
-
-  emptyWrap:   { alignItems: 'center', paddingVertical: 60 },
-  emptyTitle:  { fontSize: 14, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
-  emptyDesc:   { fontSize: 12, fontWeight: '500', textAlign: 'center' },
-
-  card:        { flexDirection: 'row', alignItems: 'flex-start', gap: 14, borderWidth: 1, borderRadius: 20, padding: 16, marginBottom: 10 },
-  cardRead:    { opacity: 0.65 },
-
-  iconWrap:    { width: 44, height: 44, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-
-  content:     { flex: 1, gap: 4 },
-  titleRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  title:       { fontSize: 13, fontWeight: '700', flex: 1 },
-  typeBadge:   { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
-  typeTxt:     { fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-
-  message:     { fontSize: 12, lineHeight: 18, fontWeight: '400' },
-
-  footer:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
-  time:        { fontSize: 10, fontWeight: '600' },
-  statusBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  statusTxt:   { fontSize: 9, fontWeight: '700' },
-
-  dot:         { width: 8, height: 8, borderRadius: 4, marginTop: 4, flexShrink: 0 },
-});

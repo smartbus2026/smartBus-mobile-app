@@ -2,8 +2,9 @@ import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Menu, Settings } from 'lucide-react-native';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { I18nManager, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useThemeColor } from '../../constants/theme';
 
 interface TopBarProps {
@@ -24,6 +25,15 @@ export default function TopBar({
   const router     = useRouter();
   const colors     = useThemeColor();
   const navigation = useNavigation();
+  const { i18n }   = useTranslation();
+
+  const isAr = i18n.language === 'ar';
+
+  const toggleLang = async () => {
+    const next = isAr ? 'en' : 'ar';
+    await i18n.changeLanguage(next);
+    I18nManager.forceRTL(next === 'ar');
+  };
 
   const handleMenu = () => {
     try {
@@ -62,7 +72,18 @@ export default function TopBar({
         </Text>
 
         {/* Right */}
-        <View style={s.side}>
+        <View style={[s.side, { flexDirection: 'row', gap: 4 }]}>
+          {/* Language Toggle */}
+          <TouchableOpacity
+            style={[s.langBtn, { borderColor: colors.border, backgroundColor: `${colors.tint}1A` }]}
+            onPress={toggleLang}
+            activeOpacity={0.7}
+          >
+            <Text style={{ fontSize: 11, fontWeight: '900', color: colors.tint }}>
+              {isAr ? 'EN' : 'ع'}
+            </Text>
+          </TouchableOpacity>
+
           {showSettings ? (
             <TouchableOpacity style={s.iconBtn} onPress={onSettingsPress} activeOpacity={0.7}>
               <Settings size={20} color={colors.text} />
@@ -87,14 +108,23 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
   },
   side: {
-    width: 48,
+    width: 64,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
   },
   iconBtn: {
     width: 38,
     height: 38,
     borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  langBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -1,78 +1,59 @@
-import { useRouter } from "expo-router";
+// app/(admin)/reports.tsx
+import { useCallback, useEffect, useState } from 'react';
 import {
-  Calendar,
-  CheckCircle,
-  Clock,
-  Filter,
-  MapPin,
-  Users,
-  X,
-  Bus
-} from "lucide-react-native";
-import React, { useCallback, useEffect, useState } from "react";
+  ActivityIndicator, Modal, Platform, ScrollView,
+  Text, TextInput, TouchableOpacity, View,
+} from 'react-native';
 import {
-  ActivityIndicator,
-  Modal,
-  Platform,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
-} from "react-native";
-import { useThemeColor } from "../../constants/theme";
-import api from "../../src/services/api";
-import TopBar from "../../src/components/TopBar";
+  Bus, Calendar, CheckCircle, Clock,
+  Filter, MapPin, Users, X,
+} from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { Colors } from '../../constants/theme';
+import { useTheme } from '../../src/context/ThemeContext';
+import api from '../../src/services/api';
+import TopBar from '../../src/components/TopBar';
 
 interface DashboardData {
-  totalUsers: number;
-  totalTrips: number;
-  activeTrips: number;
-  totalBookings: number;
+  totalUsers: number; totalTrips: number; activeTrips: number; totalBookings: number;
 }
 
 export default function AdminReportsScreen() {
-  const colors = useThemeColor();
+  const { theme } = useTheme();
+  const colors = Colors[theme];
   const router = useRouter();
 
-  // ── Dashboard State ──
-  const [dashData, setDashData] = useState<DashboardData | null>(null);
+  const [dashData, setDashData]           = useState<DashboardData | null>(null);
   const [isDashLoading, setIsDashLoading] = useState(true);
 
-  // ── Attendance Report State ──
   const todayStr = new Date().toISOString().split('T')[0];
-  const [filters, setFilters] = useState({ date: todayStr, routeId: '', busId: '', timeSlot: '', specificReturnTime: '' });
-  const [tempFilters, setTempFilters] = useState(filters);
+  const [filters, setFilters]             = useState({ date: todayStr, routeId: '', busId: '', timeSlot: '', specificReturnTime: '' });
+  const [tempFilters, setTempFilters]     = useState(filters);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 
-  const [routes, setRoutes] = useState<any[]>([]);
-  const [buses, setBuses] = useState<any[]>([]);
-  const [bookings, setBookings] = useState<any[]>([]);
-  const [stats, setStats] = useState({ completed: 0, missed: 0, total: 0, rate: 0 });
+  const [routes, setRoutes]               = useState<any[]>([]);
+  const [buses, setBuses]                 = useState<any[]>([]);
+  const [bookings, setBookings]           = useState<any[]>([]);
+  const [stats, setStats]                 = useState({ completed: 0, missed: 0, total: 0, rate: 0 });
   const [isReportLoading, setIsReportLoading] = useState(false);
 
-  // 1. Fetch Dashboard Stats & Dropdown Options
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
         const [dashRes, rRes, bRes] = await Promise.all([
           api.get('/reports/dashboard-stats'),
           api.get('/routes').catch(() => ({ data: { data: [] } })),
-          api.get('/tracking/buses').catch(() => ({ data: { data: { buses: [] } } }))
+          api.get('/tracking/buses').catch(() => ({ data: { data: { buses: [] } } })),
         ]);
         setDashData(dashRes.data);
         setRoutes(rRes.data?.data || rRes.data || []);
         setBuses(bRes.data?.data?.buses || bRes.data?.buses || bRes.data?.data || []);
-      } catch (err) {
-        console.log("Failed to fetch initial data", err);
-      } finally {
-        setIsDashLoading(false);
-      }
+      } catch (err) { console.log('Failed to fetch initial data', err); }
+      finally { setIsDashLoading(false); }
     };
     fetchInitialData();
   }, []);
 
-  // 2. Fetch Attendance Report
   const fetchReport = useCallback(async () => {
     setIsReportLoading(true);
     try {
@@ -81,47 +62,30 @@ export default function AdminReportsScreen() {
       if (filters.routeId) params.set('routeId', filters.routeId);
       if (filters.busId) params.set('busId', filters.busId);
       if (filters.timeSlot) params.set('timeSlot', filters.timeSlot);
-      if (filters.timeSlot === 'Return' && filters.specificReturnTime) {
-        params.set('specificReturnTime', filters.specificReturnTime);
-      }
-
+      if (filters.timeSlot === 'Return' && filters.specificReturnTime) params.set('specificReturnTime', filters.specificReturnTime);
       const res = await api.get(`/reports/attendance?${params.toString()}`);
       setBookings(res.data?.data?.bookings || []);
       setStats(res.data?.data?.stats || { completed: 0, missed: 0, total: 0, rate: 0 });
-    } catch (err) {
-      console.log('Failed to fetch attendance report', err);
-      setBookings([]);
-    } finally {
-      setIsReportLoading(false);
-    }
+    } catch { setBookings([]); }
+    finally { setIsReportLoading(false); }
   }, [filters]);
 
-  useEffect(() => {
-    fetchReport();
-  }, [fetchReport]);
+  useEffect(() => { fetchReport(); }, [fetchReport]);
 
-  // ── Handlers ──
-  const applyFilters = () => {
-    setFilters(tempFilters);
-    setIsFilterModalOpen(false);
-  };
-
-  const clearFilters = () => {
+  const applyFilters  = () => { setFilters(tempFilters); setIsFilterModalOpen(false); };
+  const clearFilters  = () => {
     const cleared = { date: todayStr, routeId: '', busId: '', timeSlot: '', specificReturnTime: '' };
-    setTempFilters(cleared);
-    setFilters(cleared);
-    setIsFilterModalOpen(false);
+    setTempFilters(cleared); setFilters(cleared); setIsFilterModalOpen(false);
   };
-
   const activeFiltersCount = Object.values(filters).filter(v => v !== '' && v !== todayStr).length + (filters.date ? 1 : 0);
 
   if (isDashLoading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <TopBar title="System Reports" showMenu showSettings onSettingsPress={() => router.push('/(admin)/settings' as any)} />
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 }}>
           <ActivityIndicator size="large" color={colors.tint} />
-          <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginTop: 12, color: colors.icon }}>Loading Dashboard...</Text>
+          <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 3, color: colors.icon }}>LOADING...</Text>
         </View>
       </View>
     );
@@ -132,19 +96,29 @@ export default function AdminReportsScreen() {
       <TopBar title="System Reports" showMenu showSettings onSettingsPress={() => router.push('/(admin)/settings' as any)} />
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-        
-        {/* ── Dashboard Stats ── */}
+
+        {/* Header */}
+        <View style={{ marginBottom: 24 }}>
+          <Text style={{ fontSize: 22, fontWeight: '900', textTransform: 'uppercase', letterSpacing: -0.5, color: colors.text }}>
+            SYSTEM{' '}<Text style={{ color: colors.tint }}>REPORTS</Text>
+          </Text>
+          <Text style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginTop: 2 }}>
+            ANALYTICS & ATTENDANCE
+          </Text>
+        </View>
+
+        {/* Stats Grid */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 24 }}>
           {[
-            { title: "Total Students", value: dashData?.totalUsers || 0,    icon: <Users size={20} color={colors.tint} /> },
-            { title: "Total Trips",    value: dashData?.totalTrips || 0,    icon: <MapPin size={20} color={colors.success || '#22c55e'} /> },
-            { title: "Active Trips",   value: dashData?.activeTrips || 0,   icon: <Clock size={20} color={colors.text} /> },
-            { title: "Total Bookings", value: dashData?.totalBookings || 0, icon: <CheckCircle size={20} color={colors.icon} /> },
+            { title: 'Total Students', value: dashData?.totalUsers    || 0, icon: <Users    size={20} color={colors.tint} /> },
+            { title: 'Total Trips',    value: dashData?.totalTrips    || 0, icon: <MapPin   size={20} color={colors.tint} /> },
+            { title: 'Active Trips',   value: dashData?.activeTrips   || 0, icon: <Clock    size={20} color={colors.tint} /> },
+            { title: 'Total Bookings', value: dashData?.totalBookings || 0, icon: <CheckCircle size={20} color={colors.tint} /> },
           ].map((s, i) => (
             <View key={i} style={{ width: '48%', borderRadius: 20, padding: 16, marginBottom: 12, borderWidth: 1, backgroundColor: colors.card, borderColor: colors.border }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                 <Text style={{ fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: colors.icon, flex: 1, paddingRight: 4 }}>{s.title}</Text>
-                <View style={{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}>
+                <View style={{ width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: `${colors.tint}1A`, borderWidth: 1, borderColor: `${colors.tint}33` }}>
                   {s.icon}
                 </View>
               </View>
@@ -153,63 +127,78 @@ export default function AdminReportsScreen() {
           ))}
         </View>
 
-        {/* ── Attendance Report Panel ── */}
+        {/* Attendance Panel */}
         <View style={{ borderRadius: 24, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, overflow: 'hidden' }}>
-          
-          {/* Header & Filter Trigger */}
-          <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: 'rgba(0,0,0,0.02)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+
+          {/* Header */}
+          <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 14, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>Attendance Report</Text>
+              <Text style={{ fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>ATTENDANCE REPORT</Text>
               <Text style={{ fontSize: 10, fontWeight: '700', color: colors.icon, marginTop: 4 }}>{stats.total} records found</Text>
             </View>
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => setIsFilterModalOpen(true)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: 1, backgroundColor: activeFiltersCount > 0 ? colors.tint : colors.background, borderColor: activeFiltersCount > 0 ? colors.tint : colors.border }}
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 6,
+                paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: 1,
+                backgroundColor: activeFiltersCount > 0 ? colors.tint : colors.background,
+                borderColor: activeFiltersCount > 0 ? colors.tint : colors.border,
+              }}
             >
               <Filter size={14} color={activeFiltersCount > 0 ? '#000' : colors.text} />
               <Text style={{ fontSize: 10, fontWeight: '900', textTransform: 'uppercase', color: activeFiltersCount > 0 ? '#000' : colors.text }}>
-                Filters {activeFiltersCount > 0 ? `(${activeFiltersCount})` : ''}
+                FILTERS {activeFiltersCount > 0 ? `(${activeFiltersCount})` : ''}
               </Text>
             </TouchableOpacity>
           </View>
 
-          {/* Report Stats Row */}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.background }}>
+          {/* Stats Row */}
+          <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border }}>
             {[
-              { label: 'Total',     value: stats.total,     color: colors.text, bg: colors.background },
-              { label: 'Completed', value: stats.completed, color: colors.success || '#22c55e', bg: `${colors.success || '#22c55e'}1A` },
-              { label: 'Missed',    value: stats.missed,    color: colors.error || '#ef4444', bg: `${colors.error || '#ef4444'}1A` },
-              { label: 'Rate',      value: `${stats.rate}%`,color: stats.rate >= 75 ? (colors.success || '#22c55e') : (colors.error || '#ef4444'), bg: colors.background },
+              { label: 'Total',     value: stats.total,     color: colors.text },
+              { label: 'Completed', value: stats.completed, color: colors.success || '#22c55e' },
+              { label: 'Missed',    value: stats.missed,    color: '#ef4444' },
+              { label: 'Rate',      value: `${stats.rate}%`, color: stats.rate >= 75 ? (colors.success || '#22c55e') : '#ef4444' },
             ].map((s, i) => (
-              <View key={i} style={{ width: '25%', padding: 12, alignItems: 'center', backgroundColor: s.bg, borderRightWidth: i !== 3 ? 1 : 0, borderRightColor: colors.border }}>
-                <Text style={{ fontSize: 8, fontWeight: '900', textTransform: 'uppercase', color: colors.icon, marginBottom: 4 }}>{s.label}</Text>
-                <Text style={{ fontSize: 14, fontWeight: '900', color: s.color }}>{s.value}</Text>
+              <View key={i} style={{
+                width: '25%', padding: 14, alignItems: 'center',
+                borderRightWidth: i !== 3 ? 1 : 0, borderRightColor: colors.border,
+                backgroundColor: i === 1 ? `${colors.success || '#22c55e'}0D` : i === 2 ? 'rgba(239,68,68,0.05)' : 'transparent',
+              }}>
+                <Text style={{ fontSize: 8, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.icon, marginBottom: 4 }}>{s.label}</Text>
+                <Text style={{ fontSize: 16, fontWeight: '900', color: s.color }}>{s.value}</Text>
               </View>
             ))}
           </View>
 
-          {/* Bookings List */}
+          {/* Bookings */}
           <View style={{ padding: 12 }}>
             {isReportLoading ? (
-              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+              <View style={{ paddingVertical: 40, alignItems: 'center', gap: 12 }}>
                 <ActivityIndicator color={colors.tint} />
-                <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginTop: 12, color: colors.icon }}>Syncing Data...</Text>
+                <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon }}>SYNCING DATA...</Text>
               </View>
             ) : bookings.length === 0 ? (
-              <View style={{ paddingVertical: 40, alignItems: 'center', opacity: 0.5 }}>
-                <Users size={32} color={colors.icon} style={{ marginBottom: 12 }} />
+              <View style={{ paddingVertical: 40, alignItems: 'center', gap: 12 }}>
+                <View style={{ width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: `${colors.tint}1A`, borderWidth: 1, borderColor: `${colors.tint}33` }}>
+                  <Users size={24} color={colors.tint} />
+                </View>
                 <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>No records match filters</Text>
               </View>
             ) : (
               bookings.map((b: any) => {
                 const isCompleted = b.attendanceStatus === 'completed';
+                const statusColor = isCompleted ? (colors.success || '#22c55e') : '#ef4444';
                 return (
-                  <View key={b._id} style={{ flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border, borderLeftWidth: 3, borderLeftColor: isCompleted ? (colors.success || '#22c55e') : (colors.error || '#ef4444'), backgroundColor: colors.background, marginBottom: 8, borderRadius: 12 }}>
-                    
+                  <View key={b._id} style={{
+                    flexDirection: 'row', alignItems: 'center', padding: 16, marginBottom: 8,
+                    borderRadius: 14, borderWidth: 1, borderLeftWidth: 3,
+                    backgroundColor: colors.background, borderColor: colors.border,
+                    borderLeftColor: statusColor,
+                  }}>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 13, fontWeight: '900', color: colors.text, marginBottom: 2 }}>{b.user?.name || '—'}</Text>
                       <Text style={{ fontSize: 10, color: colors.icon, marginBottom: 8 }}>{b.user?.email || '—'}</Text>
-                      
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                           <MapPin size={10} color={colors.tint} />
@@ -225,13 +214,11 @@ export default function AdminReportsScreen() {
                         </View>
                       </View>
                     </View>
-
-                    <View style={{ backgroundColor: isCompleted ? `${colors.success || '#22c55e'}1A` : `${colors.error || '#ef4444'}1A`, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: isCompleted ? `${colors.success || '#22c55e'}33` : `${colors.error || '#ef4444'}33` }}>
-                      <Text style={{ fontSize: 9, fontWeight: '900', textTransform: 'uppercase', color: isCompleted ? (colors.success || '#22c55e') : (colors.error || '#ef4444') }}>
+                    <View style={{ backgroundColor: `${statusColor}1A`, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: `${statusColor}33` }}>
+                      <Text style={{ fontSize: 9, fontWeight: '900', textTransform: 'uppercase', color: statusColor }}>
                         {isCompleted ? 'Present' : 'Missed'}
                       </Text>
                     </View>
-
                   </View>
                 );
               })
@@ -240,22 +227,22 @@ export default function AdminReportsScreen() {
         </View>
       </ScrollView>
 
-      {/* ── Filters Bottom Sheet Modal ── */}
+      {/* Filters Modal */}
       <Modal visible={isFilterModalOpen} transparent animationType="slide">
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: "rgba(0,0,0,0.6)" }}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' }}>
           <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 32, borderTopRightRadius: 32, maxHeight: '85%', paddingBottom: Platform.OS === 'ios' ? 40 : 20 }}>
-            
+
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 24, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-              <Text style={{ fontSize: 16, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>Report Filters</Text>
-              <TouchableOpacity onPress={() => setIsFilterModalOpen(false)} style={{ padding: 8, borderRadius: 12, backgroundColor: colors.background }}>
-                <X size={20} color={colors.text} />
+              <Text style={{ fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>REPORT FILTERS</Text>
+              <TouchableOpacity onPress={() => setIsFilterModalOpen(false)}
+                style={{ width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}>
+                <X size={18} color={colors.text} />
               </TouchableOpacity>
             </View>
 
             <ScrollView contentContainerStyle={{ padding: 24 }} showsVerticalScrollIndicator={false}>
-              
-              {/* Date Filter */}
-              <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10, color: colors.icon }}>Select Date</Text>
+              {/* Date */}
+              <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10, color: colors.icon }}>SELECT DATE</Text>
               <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
                 {[{ label: 'Today', val: todayStr }, { label: 'Yesterday', val: new Date(Date.now() - 86400000).toISOString().split('T')[0] }].map(opt => (
                   <TouchableOpacity key={opt.label} onPress={() => setTempFilters(f => ({ ...f, date: opt.val }))}
@@ -264,20 +251,16 @@ export default function AdminReportsScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
-              <TextInput
-                style={{ borderWidth: 1, borderRadius: 14, padding: 14, fontSize: 13, backgroundColor: colors.background, borderColor: colors.border, color: colors.text, marginBottom: 24, textAlign: 'center', fontWeight: '700' }}
-                value={tempFilters.date}
-                onChangeText={t => setTempFilters(f => ({ ...f, date: t }))}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.icon}
-              />
+              <View style={{ borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, height: 52, backgroundColor: colors.background, borderColor: colors.border, justifyContent: 'center', marginBottom: 24 }}>
+                <TextInput style={{ fontSize: 14, fontWeight: '700', color: colors.text, textAlign: 'center' }} value={tempFilters.date} onChangeText={t => setTempFilters(f => ({ ...f, date: t }))} placeholder="YYYY-MM-DD" placeholderTextColor={colors.icon} />
+              </View>
 
-              {/* Route Filter */}
-              <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10, color: colors.icon }}>Route</Text>
+              {/* Route */}
+              <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10, color: colors.icon }}>ROUTE</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
                 <TouchableOpacity onPress={() => setTempFilters(f => ({ ...f, routeId: '' }))}
-                  style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: tempFilters.routeId === '' ? colors.text : colors.border, backgroundColor: tempFilters.routeId === '' ? colors.text : colors.background }}>
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: tempFilters.routeId === '' ? colors.background : colors.text }}>All</Text>
+                  style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: tempFilters.routeId === '' ? colors.tint : colors.border, backgroundColor: tempFilters.routeId === '' ? `${colors.tint}1A` : colors.background }}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: tempFilters.routeId === '' ? colors.tint : colors.text }}>All</Text>
                 </TouchableOpacity>
                 {routes.map(r => (
                   <TouchableOpacity key={r._id} onPress={() => setTempFilters(f => ({ ...f, routeId: r._id }))}
@@ -287,12 +270,12 @@ export default function AdminReportsScreen() {
                 ))}
               </View>
 
-              {/* Bus Filter */}
-              <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10, color: colors.icon }}>Bus</Text>
+              {/* Bus */}
+              <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10, color: colors.icon }}>BUS</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
                 <TouchableOpacity onPress={() => setTempFilters(f => ({ ...f, busId: '' }))}
-                  style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: tempFilters.busId === '' ? colors.text : colors.border, backgroundColor: tempFilters.busId === '' ? colors.text : colors.background }}>
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: tempFilters.busId === '' ? colors.background : colors.text }}>All</Text>
+                  style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: tempFilters.busId === '' ? colors.tint : colors.border, backgroundColor: tempFilters.busId === '' ? `${colors.tint}1A` : colors.background }}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: tempFilters.busId === '' ? colors.tint : colors.text }}>All</Text>
                 </TouchableOpacity>
                 {buses.map(b => (
                   <TouchableOpacity key={b._id} onPress={() => setTempFilters(f => ({ ...f, busId: b._id }))}
@@ -302,8 +285,8 @@ export default function AdminReportsScreen() {
                 ))}
               </View>
 
-              {/* Time Slot Filter */}
-              <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10, color: colors.icon }}>Time Slot</Text>
+              {/* Time Slot */}
+              <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10, color: colors.icon }}>TIME SLOT</Text>
               <View style={{ flexDirection: 'row', gap: 8, marginBottom: tempFilters.timeSlot === 'Return' ? 12 : 24 }}>
                 {[{ label: 'All', val: '' }, { label: 'Morning', val: 'Morning' }, { label: 'Return', val: 'Return' }].map(slot => (
                   <TouchableOpacity key={slot.label} onPress={() => setTempFilters(f => ({ ...f, timeSlot: slot.val, specificReturnTime: '' }))}
@@ -312,8 +295,6 @@ export default function AdminReportsScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
-
-              {/* Specific Return Time */}
               {tempFilters.timeSlot === 'Return' && (
                 <View style={{ flexDirection: 'row', gap: 8, marginBottom: 24 }}>
                   {['3:30 PM', '7:00 PM'].map(time => (
@@ -324,22 +305,21 @@ export default function AdminReportsScreen() {
                   ))}
                 </View>
               )}
-
             </ScrollView>
 
-            <View style={{ padding: 24, borderTopWidth: 1, borderTopColor: colors.border, flexDirection: 'row', gap: 12 }}>
-              <TouchableOpacity onPress={clearFilters} style={{ flex: 1, paddingVertical: 16, borderRadius: 16, alignItems: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}>
-                <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: colors.text }}>Clear</Text>
+            <View style={{ padding: 20, borderTopWidth: 1, borderTopColor: colors.border, flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity onPress={clearFilters}
+                style={{ flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}>
+                <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: colors.text }}>CLEAR</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={applyFilters} style={{ flex: 2, paddingVertical: 16, borderRadius: 16, alignItems: 'center', backgroundColor: colors.tint }}>
-                <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: '#000' }}>Show Results</Text>
+              <TouchableOpacity onPress={applyFilters}
+                style={{ flex: 2, paddingVertical: 14, borderRadius: 14, alignItems: 'center', backgroundColor: colors.tint }}>
+                <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: '#000' }}>SHOW RESULTS</Text>
               </TouchableOpacity>
             </View>
-
           </View>
         </View>
       </Modal>
-
     </View>
   );
 }

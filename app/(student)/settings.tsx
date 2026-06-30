@@ -1,103 +1,136 @@
-import React, { useState, useEffect } from 'react';
+// app/(student)/settings.tsx
 import {
-  View, Text, TextInput, TouchableOpacity,
-  ScrollView, StyleSheet, ActivityIndicator,
-  Image, Switch, Alert, KeyboardAvoidingView, Platform, I18nManager
+  ActivityIndicator, Alert, Image, KeyboardAvoidingView,
+  Platform, ScrollView, Switch, Text, TextInput,
+  TouchableOpacity, View,
 } from 'react-native';
-import { User, Shield, Bell, Save, Camera, Sun, Moon, Globe, Palette } from 'lucide-react-native';
+import { Bell, Camera, Lock, Moon, Save, Sun, User } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Updates from 'expo-updates'; // لعمل إعادة تشغيل للتطبيق لتطبيق الـ RTL
-import { useTranslation } from 'react-i18next';
-
+import { useEffect, useState } from 'react';
+import { Colors } from '../../constants/theme';
+import { useTheme } from '../../src/context/ThemeContext';
 import Api from '../../src/services/api';
 import TopBar from '../../src/components/TopBar';
 import { BOTTOM_BAR_HEIGHT } from '../../src/hooks/useBottomBarHeight';
-import { useTheme } from '../../src/context/ThemeContext';
-import { Colors } from '../../constants/theme';
 
 interface ProfileData {
-  _id: string;
-  name: string;
-  email: string;
-  phone: string;
-  student_id: string;
-  role: string;
+  _id: string; name: string; email: string;
+  phone: string; student_id: string; role: string;
 }
 
+// ─── Section Card ─────────────────────────────────────────────────────────────
+const SectionCard: React.FC<{
+  icon: React.ReactNode; title: string; subtitle: string;
+  children: React.ReactNode; colors: any;
+}> = ({ icon, title, subtitle, children, colors }) => (
+  <View style={{
+    borderRadius: 24, borderWidth: 1, padding: 24, marginBottom: 16,
+    backgroundColor: colors.card, borderColor: colors.border,
+  }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 24 }}>
+      <View style={{
+        width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
+        backgroundColor: `${colors.tint}1A`, borderWidth: 1, borderColor: `${colors.tint}33`,
+      }}>
+        {icon}
+      </View>
+      <View>
+        <Text style={{ fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>
+          {title}
+        </Text>
+        <Text style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, color: colors.icon, marginTop: 2 }}>
+          {subtitle}
+        </Text>
+      </View>
+    </View>
+    {children}
+  </View>
+);
+
+// ─── Field ────────────────────────────────────────────────────────────────────
+const Field: React.FC<{
+  label: string; value: string; onChange: (v: string) => void;
+  placeholder?: string; secureTextEntry?: boolean; editable?: boolean;
+  keyboardType?: any; colors: any;
+}> = ({ label, value, onChange, placeholder, secureTextEntry, editable = true, keyboardType, colors }) => (
+  <View style={{ marginBottom: 16 }}>
+    <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginBottom: 8 }}>
+      {label}
+    </Text>
+    <View style={{
+      flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 14,
+      paddingHorizontal: 16, height: 52,
+      backgroundColor: editable ? colors.background : `${colors.border}33`,
+      borderColor: colors.border,
+    }}>
+      <TextInput
+        style={{ flex: 1, fontSize: 14, fontWeight: '700', color: editable ? colors.text : colors.icon }}
+        value={value}
+        onChangeText={onChange}
+        placeholder={placeholder}
+        placeholderTextColor={colors.icon}
+        secureTextEntry={secureTextEntry}
+        editable={editable}
+        keyboardType={keyboardType}
+        autoCapitalize="none"
+      />
+    </View>
+  </View>
+);
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function SettingsScreen() {
   const { t, i18n } = useTranslation();
   const { theme, toggleTheme } = useTheme();
   const colors = Colors[theme];
 
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [profile, setProfile]   = useState<ProfileData | null>(null);
+  const [preview, setPreview]   = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSaving, setIsSaving]   = useState(false);
 
-  // Form States
-  const [name, setName] = useState('');
+  const [name, setName]   = useState('');
   const [phone, setPhone] = useState('');
   const [passForm, setPassForm] = useState({ current: '', newPass: '', confirm: '' });
   const [prefs, setPrefs] = useState({ bookingAlerts: true });
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const res = await Api.get('/users/profile');
+    Api.get('/users/profile')
+      .then(res => {
         const data = res.data;
         setProfile(data);
         setName(data.name || '');
         setPhone(data.phone || '');
         setPreview(data.profilePicture || null);
-      } catch (err) {
-        console.error('Failed to fetch profile', err);
-        Alert.alert(t('error'), t('failed_load_profile'));
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchProfile();
+      })
+      .catch(() => Alert.alert('Error', 'Failed to load profile data.'))
+      .finally(() => setIsLoading(false));
   }, []);
 
   const handlePickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) return;
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
+      allowsEditing: true, aspect: [1, 1], quality: 0.8,
     });
-
-    if (!result.canceled && result.assets[0]) {
-      setPreview(result.assets[0].uri);
-    }
+    if (!result.canceled && result.assets[0]) setPreview(result.assets[0].uri);
   };
 
   const handleSave = async () => {
     if (passForm.newPass && passForm.newPass !== passForm.confirm) {
-      Alert.alert(t('error'), t('passwords_no_match'));
-      return;
+      Alert.alert('Error', 'New passwords do not match.'); return;
     }
-
     if (!profile) return;
     setIsSaving(true);
-
     try {
       const payload: any = { name, phone };
-      
-      if (passForm.newPass) {
-        payload.password = passForm.newPass;
-      }
-
+      if (passForm.newPass) payload.password = passForm.newPass;
       await Api.put(`/users/${profile._id}`, payload);
       Alert.alert(t('settings_saved'), '');
       setPassForm({ current: '', newPass: '', confirm: '' });
     } catch (err: any) {
-      console.error(err);
-      Alert.alert(t('error'), err.response?.data?.message || t('failed_save_settings'));
+      Alert.alert('Error', err.response?.data?.message || 'Failed to save settings.');
     } finally {
       setIsSaving(false);
     }
@@ -126,261 +159,164 @@ export default function SettingsScreen() {
 
   if (isLoading) {
     return (
-      <View style={[s.centerWrap, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.tint} />
-        <Text style={[s.loadText, { color: colors.icon }]}>{t('loading_settings')}</Text>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <TopBar title="Settings" showMenu />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 }}>
+          <ActivityIndicator size="large" color={colors.tint} />
+          <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 3, color: colors.icon }}>
+            LOADING...
+          </Text>
+        </View>
       </View>
     );
   }
 
   return (
-    <View style={[s.root, { backgroundColor: colors.background }]}>
-      
-      <TopBar 
-        title={t('settings')} 
-        showMenu={true} 
-        showSettings={false} 
-      />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <TopBar title="Settings" showMenu />
 
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
-          contentContainerStyle={[s.scroll, { paddingBottom: BOTTOM_BAR_HEIGHT + 24 }]}
+          contentContainerStyle={{ padding: 20, paddingBottom: BOTTOM_BAR_HEIGHT + 24 }}
           showsVerticalScrollIndicator={false}
         >
+          {/* Header */}
+          <View style={{ marginBottom: 24 }}>
+            <Text style={{ fontSize: 22, fontWeight: '900', textTransform: 'uppercase', letterSpacing: -0.5, color: colors.text }}>
+              MY{' '}<Text style={{ color: colors.tint }}>SETTINGS</Text>
+            </Text>
+            <Text style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginTop: 2 }}>
+              PROFILE & SECURITY
+            </Text>
+          </View>
 
-          {/* ── Avatar Header ── */}
-          <View style={s.avatarContainer}>
-            <View style={s.avatarWrap}>
-              <View style={[s.avatarRing, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                {preview ? (
-                  <Image source={{ uri: preview }} style={s.avatarImg} />
-                ) : (
-                  <Text style={[s.avatarInitial, { color: colors.icon }]}>
-                    {profile?.name?.charAt(0) || '?'}
-                  </Text>
-                )}
+          {/* Avatar */}
+          <View style={{ alignItems: 'center', marginBottom: 24 }}>
+            <View style={{ position: 'relative', marginBottom: 12 }}>
+              <View style={{
+                width: 80, height: 80, borderRadius: 28,
+                alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+                backgroundColor: `${colors.tint}1A`, borderWidth: 2, borderColor: `${colors.tint}33`,
+              }}>
+                {preview
+                  ? <Image source={{ uri: preview }} style={{ width: '100%', height: '100%' }} />
+                  : <Text style={{ fontSize: 32, fontWeight: '900', color: colors.tint }}>
+                      {profile?.name?.charAt(0) || '?'}
+                    </Text>
+                }
               </View>
               <TouchableOpacity
-                style={[s.editAvatarBtn, { backgroundColor: colors.tint, borderColor: colors.background }]}
-                onPress={handlePickImage}
-                activeOpacity={0.8}
+                onPress={handlePickImage} activeOpacity={0.8}
+                style={{
+                  position: 'absolute', bottom: 0, right: 0,
+                  width: 28, height: 28, borderRadius: 10,
+                  alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: colors.tint, borderWidth: 2, borderColor: colors.background,
+                }}
               >
-                <Camera size={14} color="#000" />
+                <Camera size={13} color="#000" />
               </TouchableOpacity>
             </View>
-            <Text style={[s.headerName, { color: colors.text }]}>{profile?.name}</Text>
-            <Text style={[s.headerRole, { color: colors.tint }]}>{profile?.role?.toUpperCase()}</Text>
-          </View>
-
-          {/* ── Account Information ── */}
-          <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={s.cardHeader}>
-              <User size={16} color={colors.tint} />
-              <Text style={[s.cardTitle, { color: colors.text }]}>{t('account_info')}</Text>
-            </View>
-
-            <View style={s.inputGroup}>
-              <Text style={[s.label, { color: colors.icon }]}>{t('full_name')}</Text>
-              <TextInput
-                style={[s.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
-                value={name}
-                onChangeText={setName}
-                placeholder={t('placeholder_name')}
-                placeholderTextColor={colors.icon}
-                textAlign={I18nManager.isRTL ? 'right' : 'left'}
-              />
-            </View>
-
-            <View style={s.inputGroup}>
-              <Text style={[s.label, { color: colors.icon }]}>{t('phone_number')}</Text>
-              <TextInput
-                style={[s.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
-                value={phone}
-                onChangeText={setPhone}
-                placeholder={t('placeholder_phone')}
-                placeholderTextColor={colors.icon}
-                keyboardType="phone-pad"
-                textAlign={I18nManager.isRTL ? 'right' : 'left'}
-              />
-            </View>
-
-            {/* Readonly Fields */}
-            <View style={s.row}>
-              <View style={[s.inputGroup, { flex: 1 }]}>
-                <Text style={[s.label, { color: colors.icon }]}>{t('student_id')}</Text>
-                <TextInput
-                  style={[s.input, s.inputDisabled, { backgroundColor: colors.background, borderColor: colors.border, color: colors.icon }]}
-                  value={profile?.student_id}
-                  editable={false}
-                  textAlign={I18nManager.isRTL ? 'right' : 'left'}
-                />
-              </View>
-              <View style={[s.inputGroup, { flex: 1 }]}>
-                <Text style={[s.label, { color: colors.icon }]}>{t('email_address')}</Text>
-                <TextInput
-                  style={[s.input, s.inputDisabled, { backgroundColor: colors.background, borderColor: colors.border, color: colors.icon }]}
-                  value={profile?.email}
-                  editable={false}
-                  textAlign={I18nManager.isRTL ? 'right' : 'left'}
-                />
-              </View>
+            <Text style={{ fontSize: 16, fontWeight: '900', color: colors.text }}>{profile?.name}</Text>
+            <View style={{
+              borderRadius: 6, paddingHorizontal: 10, paddingVertical: 3, marginTop: 6,
+              backgroundColor: `${colors.tint}1A`, borderWidth: 1, borderColor: `${colors.tint}33`,
+            }}>
+              <Text style={{ fontSize: 8, fontWeight: '900', letterSpacing: 2, color: colors.tint }}>
+                {profile?.role?.toUpperCase()}
+              </Text>
             </View>
           </View>
 
-          {/* ── Preferences & Language ── */}
-          <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            
-            {/* Theme Switch */}
-            <View style={s.cardHeader}>
-              <Palette size={16} color={colors.tint} />
-              <Text style={[s.cardTitle, { color: colors.text }]}>{t('appearance')}</Text>
+          {/* ── 1. Account Info ── */}
+          <SectionCard icon={<User size={22} color={colors.tint} />} title="Account Information" subtitle="Personal Details" colors={colors}>
+            <Field label="Full Name"     value={name}  onChange={setName}  placeholder="Enter your name"  colors={colors} />
+            <Field label="Phone Number"  value={phone} onChange={setPhone} placeholder="Enter your phone" keyboardType="phone-pad" colors={colors} />
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Field label="Student ID"     value={profile?.student_id || ''} onChange={() => {}} editable={false} colors={colors} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Field label="Email Address"  value={profile?.email || ''}      onChange={() => {}} editable={false} colors={colors} />
+              </View>
             </View>
+          </SectionCard>
 
-            <View style={[s.switchRow, { marginBottom: 24 }]}>
+          {/* ── 2. Password ── */}
+          <SectionCard icon={<Lock size={22} color={colors.icon} />} title="Security" subtitle="Change Password" colors={colors}>
+            <Field label="Current Password" value={passForm.current} onChange={v => setPassForm(p => ({ ...p, current: v }))} placeholder="••••••••" secureTextEntry colors={colors} />
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Field label="New Password"     value={passForm.newPass} onChange={v => setPassForm(p => ({ ...p, newPass: v }))} placeholder="••••••••" secureTextEntry colors={colors} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Field label="Confirm"          value={passForm.confirm} onChange={v => setPassForm(p => ({ ...p, confirm: v }))} placeholder="••••••••" secureTextEntry colors={colors} />
+              </View>
+            </View>
+          </SectionCard>
+
+          {/* ── 3. Theme ── */}
+          <SectionCard
+            icon={theme === 'dark' ? <Moon size={22} color={colors.icon} /> : <Sun size={22} color={colors.icon} />}
+            title="Preferences" subtitle="Interface Appearance" colors={colors}
+          >
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+              padding: 16, borderRadius: 14, borderWidth: 1,
+              backgroundColor: colors.background, borderColor: colors.border,
+            }}>
+              <View>
+                <Text style={{ fontSize: 13, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>
+                  {theme === 'dark' ? 'DARK MODE' : 'LIGHT MODE'}
+                </Text>
+                <Text style={{ fontSize: 10, fontWeight: '600', color: colors.icon, marginTop: 2 }}>Toggle interface appearance</Text>
+              </View>
+              <Switch trackColor={{ false: colors.border, true: colors.tint }} thumbColor="#fff" ios_backgroundColor={colors.border} onValueChange={toggleTheme} value={theme === 'dark'} />
+            </View>
+          </SectionCard>
+
+          {/* ── 4. Notifications ── */}
+          <SectionCard icon={<Bell size={22} color={colors.tint} />} title="Notifications" subtitle="Alert Preferences" colors={colors}>
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+              padding: 16, borderRadius: 14, borderWidth: 1,
+              backgroundColor: colors.background, borderColor: colors.border,
+            }}>
               <View style={{ flex: 1, paddingRight: 16 }}>
-                <Text style={[s.switchTitle, { color: colors.text }]}>
-                  {theme === 'dark' ? t('dark_mode') : t('light_mode')}
+                <Text style={{ fontSize: 13, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>
+                  BOOKING ALERTS
                 </Text>
-              </View>
-              <Switch
-                trackColor={{ false: colors.border, true: colors.tint }}
-                thumbColor="#fff"
-                ios_backgroundColor={colors.border}
-                onValueChange={toggleTheme}
-                value={theme === 'dark'}
-              />
-            </View>
-
-            {/* Language Selection */}
-            <View style={[s.cardHeader, { marginTop: 8 }]}>
-              <Globe size={16} color={colors.tint} />
-              <Text style={[s.cardTitle, { color: colors.text }]}>{t('language')}</Text>
-            </View>
-
-            <View style={s.themeRow}>
-              {/* English Button */}
-              <TouchableOpacity
-                style={[
-                  s.themeBtn,
-                  { backgroundColor: colors.background, borderColor: colors.border },
-                  i18n.language === 'en' && { borderColor: colors.tint, backgroundColor: `${colors.tint}1A` }
-                ]}
-                onPress={() => handleLanguageChange('en')}
-                activeOpacity={0.8}
-              >
-                <Text style={[
-                  s.themeBtnText,
-                  { color: colors.icon },
-                  i18n.language === 'en' && { color: colors.tint }
-                ]}>
-                  English
+                <Text style={{ fontSize: 10, fontWeight: '600', color: colors.icon, marginTop: 2, lineHeight: 16 }}>
+                  Push notifications for bus assignments and delays
                 </Text>
-              </TouchableOpacity>
-
-              {/* Arabic Button */}
-              <TouchableOpacity
-                style={[
-                  s.themeBtn,
-                  { backgroundColor: colors.background, borderColor: colors.border },
-                  i18n.language === 'ar' && { borderColor: colors.tint, backgroundColor: `${colors.tint}1A` }
-                ]}
-                onPress={() => handleLanguageChange('ar')}
-                activeOpacity={0.8}
-              >
-                <Text style={[
-                  s.themeBtnText,
-                  { color: colors.icon },
-                  i18n.language === 'ar' && { color: colors.tint }
-                ]}>
-                  العربية
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* ── Security / Password ── */}
-          <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={s.cardHeader}>
-              <Shield size={16} color={colors.tint} />
-              <Text style={[s.cardTitle, { color: colors.text }]}>{t('change_password')}</Text>
-            </View>
-
-            <View style={s.inputGroup}>
-              <TextInput
-                style={[s.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
-                value={passForm.current}
-                onChangeText={(t) => setPassForm(p => ({ ...p, current: t }))}
-                placeholder={t('placeholder_current_password')}
-                placeholderTextColor={colors.icon}
-                secureTextEntry
-                textAlign={I18nManager.isRTL ? 'right' : 'left'}
-              />
-            </View>
-
-            <View style={s.row}>
-              <View style={[s.inputGroup, { flex: 1 }]}>
-                <TextInput
-                  style={[s.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
-                  value={passForm.newPass}
-                  onChangeText={(t) => setPassForm(p => ({ ...p, newPass: t }))}
-                  placeholder={t('placeholder_new_password')}
-                  placeholderTextColor={colors.icon}
-                  secureTextEntry
-                  textAlign={I18nManager.isRTL ? 'right' : 'left'}
-                />
-              </View>
-              <View style={[s.inputGroup, { flex: 1 }]}>
-                <TextInput
-                  style={[s.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
-                  value={passForm.confirm}
-                  onChangeText={(t) => setPassForm(p => ({ ...p, confirm: t }))}
-                  placeholder={t('placeholder_confirm_password')}
-                  placeholderTextColor={colors.icon}
-                  secureTextEntry
-                  textAlign={I18nManager.isRTL ? 'right' : 'left'}
-                />
-              </View>
-            </View>
-          </View>
-
-          {/* ── Notifications ── */}
-          <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={s.cardHeader}>
-              <Bell size={16} color={colors.tint} />
-              <Text style={[s.cardTitle, { color: colors.text }]}>{t('notifications')}</Text>
-            </View>
-
-            <View style={s.switchRow}>
-              <View style={{ flex: 1, paddingRight: 16 }}>
-                <Text style={[s.switchTitle, { color: colors.text }]}>{t('booking_alerts')}</Text>
               </View>
               <Switch
                 value={prefs.bookingAlerts}
-                onValueChange={(val) => setPrefs(p => ({ ...p, bookingAlerts: val }))}
+                onValueChange={val => setPrefs(p => ({ ...p, bookingAlerts: val }))}
                 trackColor={{ false: colors.border, true: colors.tint }}
                 thumbColor={Platform.OS === 'ios' ? '#fff' : prefs.bookingAlerts ? '#fff' : '#f4f3f4'}
               />
             </View>
-          </View>
+          </SectionCard>
 
           {/* ── Save Button ── */}
           <TouchableOpacity
-            style={[s.saveBtn, { backgroundColor: colors.tint }, isSaving && { opacity: 0.7 }]}
-            onPress={handleSave}
-            disabled={isSaving}
-            activeOpacity={0.8}
+            onPress={handleSave} disabled={isSaving} activeOpacity={0.8}
+            style={{
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+              paddingVertical: 14, borderRadius: 14, marginTop: 8,
+              backgroundColor: colors.tint, opacity: isSaving ? 0.6 : 1,
+            }}
           >
-            {isSaving ? (
-              <ActivityIndicator size="small" color="#000" />
-            ) : (
-              <>
-                <Save size={16} color="#000" />
-                <Text style={s.saveBtnText}>{t('save_changes')}</Text>
-              </>
-            )}
+            {isSaving
+              ? <ActivityIndicator size="small" color="#000" />
+              : <>
+                  <Save size={16} color="#000" />
+                  <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: '#000' }}>
+                    SAVE CHANGES
+                  </Text>
+                </>
+            }
           </TouchableOpacity>
 
         </ScrollView>
@@ -388,40 +324,3 @@ export default function SettingsScreen() {
     </View>
   );
 }
-
-const s = StyleSheet.create({
-  root:           { flex: 1 },
-  scroll:         { padding: 20, gap: 16 },
-
-  centerWrap:     { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadText:       { fontSize: 11, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' },
-
-  avatarContainer:{ alignItems: 'center', marginBottom: 10 },
-  avatarWrap:     { position: 'relative', marginBottom: 12 },
-  avatarRing:     { width: 96, height: 96, borderRadius: 48, borderWidth: 3, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  avatarImg:      { width: '100%', height: '100%' },
-  avatarInitial:  { fontSize: 36, fontWeight: '900' },
-  editAvatarBtn:  { position: 'absolute', bottom: 0, right: 0, width: 32, height: 32, borderRadius: 16, borderWidth: 3, alignItems: 'center', justifyContent: 'center' },
-  headerName:     { fontSize: 18, fontWeight: '900', letterSpacing: 0.5 },
-  headerRole:     { fontSize: 10, fontWeight: '800', letterSpacing: 2, marginTop: 4 },
-
-  card:           { borderWidth: 1, borderRadius: 24, padding: 20 },
-  cardHeader:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 20 },
-  cardTitle:      { fontSize: 12, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1.5 },
-
-  themeRow:       { flexDirection: 'row', gap: 12 },
-  themeBtn:       { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderWidth: 1, borderRadius: 16 },
-  themeBtnText:   { fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1.5 },
-
-  row:            { flexDirection: 'row', gap: 12 },
-  inputGroup:     { marginBottom: 16 },
-  label:          { fontSize: 9, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8, marginLeft: 4 },
-  input:          { borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, height: 48, fontSize: 13, fontWeight: '600' },
-  inputDisabled:  { opacity: 0.6 },
-
-  switchRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  switchTitle:    { fontSize: 13, fontWeight: '800' },
-
-  saveBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 56, borderRadius: 16, marginTop: 10, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
-  saveBtnText:    { color: '#000', fontSize: 12, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1.5 },
-});

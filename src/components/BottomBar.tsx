@@ -1,12 +1,13 @@
+// src/components/BottomBar.tsx
 import { usePathname, useRouter } from 'expo-router';
-import { Bell, Home, Menu, Route, User } from 'lucide-react-native';
+import { Bell, Calendar, Home, Menu, Navigation, Route, User } from 'lucide-react-native';
 import React from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useThemeColor } from '../../constants/theme';
 import { useSidebar } from '../context/SidebarContext2';
 
 interface BottomBarProps {
-  role: 'admin' | 'student';
+  role: 'admin' | 'student' | 'driver';
 }
 
 const ADMIN_TABS = [
@@ -22,6 +23,13 @@ const STUDENT_TABS = [
   { id: 'settings',      label: 'Profile', icon: User,  path: '/(student)/settings' },
 ];
 
+const DRIVER_TABS = [
+  { id: 'dashboard',     label: 'Home',    icon: Home,       path: '/(driver)/dashboard' },
+  { id: 'my-trips',      label: 'Trips',   icon: Route,      path: '/(driver)/my-trips' },
+  { id: 'live-tracking', label: 'Live',    icon: Navigation, path: '/(driver)/live-tracking' },
+  { id: 'history',       label: 'History', icon: Calendar,   path: '/(driver)/history' },
+];
+
 export default function BottomBar({ role }: BottomBarProps) {
   const colors = useThemeColor();
   const router = useRouter();
@@ -29,14 +37,14 @@ export default function BottomBar({ role }: BottomBarProps) {
   const { openSidebar } = useSidebar();
 
   const isActive = (id: string) => pathname.includes(id.toLowerCase());
-  const tabs = role === 'admin' ? ADMIN_TABS : STUDENT_TABS;
+  const tabs = role === 'admin' ? ADMIN_TABS : role === 'driver' ? DRIVER_TABS : STUDENT_TABS;
 
   return (
     <View style={[s.bar, {
-      backgroundColor:  colors.card,
-      borderTopColor:   colors.border,
-      height:           Platform.OS === 'ios' ? 85 : 70,
-      paddingBottom:    Platform.OS === 'ios' ? 25 : 10,
+      backgroundColor: colors.card,
+      borderTopColor:  colors.border,
+      height:          Platform.OS === 'ios' ? 85 : 70,
+      paddingBottom:   Platform.OS === 'ios' ? 25 : 10,
     }]}>
       {tabs.map((tab) => {
         const Icon   = tab.icon;
@@ -56,7 +64,6 @@ export default function BottomBar({ role }: BottomBarProps) {
         );
       })}
 
-      {/* Menu → opens Sidebar */}
       <TouchableOpacity style={s.tab} onPress={openSidebar} activeOpacity={0.7}>
         <Menu size={22} color={colors.icon} />
         <Text style={[s.label, { color: colors.icon }]}>Menu</Text>
