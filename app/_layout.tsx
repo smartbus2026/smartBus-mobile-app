@@ -4,6 +4,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { ThemeProvider } from '../src/context/ThemeContext';
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import '../src/i18n'; 
 
 function RootGuard() {
   const { token, userRole, isLoading } = useAuth();
