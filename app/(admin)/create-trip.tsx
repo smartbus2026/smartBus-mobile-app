@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { Bus, CheckCircle, ChevronDown, Plus, Save, Timer, Users } from 'lucide-react-native';
 import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Colors } from '../../constants/theme';
 import { useTheme } from '../../src/context/ThemeContext';
 import api from '../../src/services/api';
@@ -48,19 +49,20 @@ const SectionCard: React.FC<{
 export default function CreateBusScreen() {
   const { theme } = useTheme();
   const colors = Colors[theme];
+  const { t } = useTranslation();
 
-  const [isSubmitting, setIsSubmitting]     = useState(false);
+  const [isSubmitting, setIsSubmitting]         = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
-  const [busForm, setBusForm]               = useState({ busCode: '', capacity: '45' });
-  const [settings, setSettings]             = useState<BookingSettings>({
+  const [busForm, setBusForm]                   = useState({ busCode: '', capacity: '45' });
+  const [settings, setSettings]                 = useState<BookingSettings>({
     booking_open_hour: 20, booking_open_minute: 0,
     booking_close_hour: 23, booking_close_minute: 0,
   });
-  const [quota, setQuota]                   = useState({ used: 0, total: 308 });
-  const [modalVisible, setModalVisible]     = useState(false);
-  const [modalState, setModalState]         = useState({ type: 'success', message: '' });
-  const [pickerVisible, setPickerVisible]   = useState(false);
-  const [pickerData, setPickerData]         = useState<{ options: (number | string)[]; type: string }>({ options: [], type: '' });
+  const [quota, setQuota]                 = useState({ used: 0, total: 308 });
+  const [modalVisible, setModalVisible]   = useState(false);
+  const [modalState, setModalState]       = useState({ type: 'success', message: '' });
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [pickerData, setPickerData]       = useState<{ options: (number | string)[]; type: string }>({ options: [], type: '' });
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -81,17 +83,17 @@ export default function CreateBusScreen() {
 
   const handleCreateBus = async () => {
     if (!busForm.busCode || !busForm.capacity) {
-      setModalState({ type: 'error', message: 'Please fill all bus fields.' });
+      setModalState({ type: 'error', message: t('fill_bus_fields') });
       setModalVisible(true); return;
     }
     setIsSubmitting(true);
     try {
       await api.post('/buses', { busCode: busForm.busCode, capacity: parseInt(busForm.capacity) || 45 });
-      setModalState({ type: 'success', message: 'Bus created successfully!' });
+      setModalState({ type: 'success', message: t('bus_created') });
       setBusForm({ busCode: '', capacity: '45' });
       setModalVisible(true);
     } catch (err: any) {
-      setModalState({ type: 'error', message: err.response?.data?.message || 'Failed to create bus.' });
+      setModalState({ type: 'error', message: err.response?.data?.message || t('bus_create_failed') });
       setModalVisible(true);
     } finally { setIsSubmitting(false); }
   };
@@ -100,10 +102,10 @@ export default function CreateBusScreen() {
     setIsSavingSettings(true);
     try {
       await api.put('/settings', settings);
-      setModalState({ type: 'success', message: 'Booking window updated successfully!' });
+      setModalState({ type: 'success', message: t('booking_window_updated') });
       setModalVisible(true);
     } catch (err: any) {
-      setModalState({ type: 'error', message: err.response?.data?.message || 'Failed to save settings.' });
+      setModalState({ type: 'error', message: err.response?.data?.message || t('failed_save_settings') });
       setModalVisible(true);
     } finally { setIsSavingSettings(false); }
   };
@@ -143,7 +145,7 @@ export default function CreateBusScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <TopBar title="Create Bus" showMenu showSettings onSettingsPress={() => router.push('/(admin)/settings' as any)} />
+      <TopBar title={t('create_bus')} showMenu showSettings onSettingsPress={() => router.push('/(admin)/settings' as any)} />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
@@ -151,18 +153,18 @@ export default function CreateBusScreen() {
           {/* Header */}
           <View style={{ marginBottom: 24 }}>
             <Text style={{ fontSize: 22, fontWeight: '900', textTransform: 'uppercase', letterSpacing: -0.5, color: colors.text }}>
-              FLEET{' '}<Text style={{ color: colors.tint }}>MANAGEMENT</Text>
+              {t('fleet_management_part1')}{' '}<Text style={{ color: colors.tint }}>{t('fleet_management_part2')}</Text>
             </Text>
             <Text style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginTop: 2 }}>
-              CREATE BUSES & BOOKING SETTINGS
+              {t('create_buses_booking_settings')}
             </Text>
           </View>
 
           {/* ── 1. Quota ── */}
-          <SectionCard icon={<Bus size={22} color={colors.tint} />} title="Monthly Fleet Quota" subtitle="In-Service Capacity" colors={colors}>
+          <SectionCard icon={<Bus size={22} color={colors.tint} />} title={t('monthly_fleet_quota')} subtitle={t('in_service_capacity')} colors={colors}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 14 }}>
               <Text style={{ fontSize: 12, fontWeight: '700', color: colors.icon }}>
-                {quota.used} / {quota.total} IN SERVICE
+                {quota.used} / {quota.total} {t('in_service')}
               </Text>
               <Text style={{ fontSize: 11, fontWeight: '900', color: quotaColor }}>
                 {Math.round(quotaPercentage)}%
@@ -174,12 +176,11 @@ export default function CreateBusScreen() {
           </SectionCard>
 
           {/* ── 2. Create Bus ── */}
-          <SectionCard icon={<Plus size={22} color={colors.tint} />} title="Create Bus" subtitle="Add New Vehicles to Fleet" colors={colors}>
+          <SectionCard icon={<Plus size={22} color={colors.tint} />} title={t('create_bus')} subtitle={t('add_vehicles_fleet')} colors={colors}>
             <View style={{ gap: 16 }}>
-              {/* Bus Code */}
               <View>
                 <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginBottom: 8 }}>
-                  Bus Number / Plate
+                  {t('bus_number_plate')}
                 </Text>
                 <View style={{
                   flexDirection: 'row', alignItems: 'center', gap: 12,
@@ -189,18 +190,17 @@ export default function CreateBusScreen() {
                   <Bus size={16} color={colors.icon} />
                   <TextInput
                     style={{ flex: 1, fontSize: 14, fontWeight: '700', color: colors.text }}
-                    placeholder="Enter bus plate..."
+                    placeholder={t('bus_placeholder')}
                     placeholderTextColor={colors.icon}
                     value={busForm.busCode}
-                    onChangeText={t => setBusForm(prev => ({ ...prev, busCode: t }))}
+                    onChangeText={v => setBusForm(prev => ({ ...prev, busCode: v }))}
                   />
                 </View>
               </View>
 
-              {/* Capacity */}
               <View>
                 <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginBottom: 8 }}>
-                  Total Seats Capacity
+                  {t('total_seats_capacity')}
                 </Text>
                 <View style={{
                   flexDirection: 'row', alignItems: 'center', gap: 12,
@@ -214,7 +214,7 @@ export default function CreateBusScreen() {
                     keyboardType="numeric"
                     placeholderTextColor={colors.icon}
                     value={busForm.capacity}
-                    onChangeText={t => setBusForm(prev => ({ ...prev, capacity: t }))}
+                    onChangeText={v => setBusForm(prev => ({ ...prev, capacity: v }))}
                   />
                 </View>
               </View>
@@ -229,21 +229,20 @@ export default function CreateBusScreen() {
               >
                 {isSubmitting
                   ? <ActivityIndicator color="#000" />
-                  : <><Plus size={16} color="#000" /><Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: '#000' }}>CREATE BUS</Text></>
+                  : <><Plus size={16} color="#000" /><Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: '#000' }}>{t('create_bus_btn')}</Text></>
                 }
               </TouchableOpacity>
             </View>
           </SectionCard>
 
           {/* ── 3. Booking Window ── */}
-          <SectionCard icon={<Timer size={22} color={colors.tint} />} title="Booking Window" subtitle="Control Registration Times" colors={colors}>
+          <SectionCard icon={<Timer size={22} color={colors.tint} />} title={t('booking_window')} subtitle={t('control_registration_times')} colors={colors}>
             {(['open', 'close'] as const).map(type => (
               <View key={type} style={{ marginBottom: 24 }}>
                 <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginBottom: 10 }}>
-                  Booking {type === 'open' ? 'Opens At' : 'Closes At'}
+                  {type === 'open' ? t('booking_opens_at') : t('booking_closes_at')}
                 </Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  {/* Hour */}
                   <TouchableOpacity
                     onPress={() => openPicker(`${type}Hour`, [12,1,2,3,4,5,6,7,8,9,10,11])}
                     style={{
@@ -258,7 +257,6 @@ export default function CreateBusScreen() {
                     <ChevronDown size={14} color={colors.icon} />
                   </TouchableOpacity>
 
-                  {/* Minute */}
                   <TouchableOpacity
                     onPress={() => openPicker(`${type}Minute`, [0, 15, 30, 45])}
                     style={{
@@ -273,7 +271,6 @@ export default function CreateBusScreen() {
                     <ChevronDown size={14} color={colors.icon} />
                   </TouchableOpacity>
 
-                  {/* AM/PM */}
                   <TouchableOpacity
                     onPress={() => openPicker(`${type}Period`, ['AM', 'PM'])}
                     style={{
@@ -292,7 +289,7 @@ export default function CreateBusScreen() {
                   fontSize: 10, fontWeight: '800', marginTop: 10, letterSpacing: 1,
                   color: type === 'open' ? (colors.success || '#10b981') : '#ef4444',
                 }}>
-                  {type === 'open' ? 'OPENS:' : 'CLOSES:'}{' '}
+                  {type === 'open' ? t('opens_label') : t('closes_label')}{' '}
                   {formatHour12(type === 'open' ? settings.booking_open_hour : settings.booking_close_hour)}:
                   {String(type === 'open' ? settings.booking_open_minute : settings.booking_close_minute).padStart(2, '0')}{' '}
                   {getAmPm(type === 'open' ? settings.booking_open_hour : settings.booking_close_hour)}
@@ -311,7 +308,7 @@ export default function CreateBusScreen() {
             >
               {isSavingSettings
                 ? <ActivityIndicator color={colors.tint} />
-                : <><Save size={16} color={colors.tint} /><Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: colors.tint }}>SAVE SETTINGS</Text></>
+                : <><Save size={16} color={colors.tint} /><Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: colors.tint }}>{t('save_settings')}</Text></>
               }
             </TouchableOpacity>
           </SectionCard>
@@ -338,7 +335,7 @@ export default function CreateBusScreen() {
               }
             </View>
             <Text style={{ fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text, marginBottom: 8 }}>
-              {modalState.type === 'success' ? 'SUCCESS!' : 'ACTION FAILED'}
+              {modalState.type === 'success' ? t('success_exclamation') : t('action_failed')}
             </Text>
             <Text style={{ fontSize: 12, fontWeight: '600', color: colors.icon, textAlign: 'center', marginBottom: 24 }}>
               {modalState.message}
@@ -348,14 +345,14 @@ export default function CreateBusScreen() {
                 onPress={() => setModalVisible(false)}
                 style={{ flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center', borderWidth: 1, backgroundColor: colors.background, borderColor: colors.border }}
               >
-                <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', color: colors.text }}>CLOSE</Text>
+                <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', color: colors.text }}>{t('close')}</Text>
               </TouchableOpacity>
               {modalState.type === 'success' && (
                 <TouchableOpacity
                   onPress={() => { setModalVisible(false); router.push('/(admin)/dashboard' as any); }}
                   style={{ flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center', backgroundColor: colors.tint }}
                 >
-                  <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', color: '#000' }}>DASHBOARD</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', color: '#000' }}>{t('dashboard')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -369,7 +366,7 @@ export default function CreateBusScreen() {
           <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 40, maxHeight: '50%' }}>
             <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' }}>
               <Text style={{ fontSize: 12, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.icon }}>
-                SELECT OPTION
+                {t('select_option')}
               </Text>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -388,7 +385,7 @@ export default function CreateBusScreen() {
               ))}
             </ScrollView>
             <TouchableOpacity onPress={() => setPickerVisible(false)} style={{ padding: 16, alignItems: 'center', marginTop: 8 }}>
-              <Text style={{ fontSize: 12, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: '#ef4444' }}>CANCEL</Text>
+              <Text style={{ fontSize: 12, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: '#ef4444' }}>{t('cancel')}</Text>
             </TouchableOpacity>
           </View>
         </View>

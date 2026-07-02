@@ -1,4 +1,5 @@
 // app/(student)/settings.tsx
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator, Alert, Image, KeyboardAvoidingView,
   Platform, ScrollView, Switch, Text, TextInput,
@@ -136,26 +137,7 @@ export default function SettingsScreen() {
     }
   };
 
-  // دالة تغيير اللغة
-  const handleLanguageChange = async (lang: 'en' | 'ar') => {
-    if (i18n.language === lang) return; // لو نفس اللغة متعملش حاجة
-
-    await AsyncStorage.setItem('app_lang', lang);
-    i18n.changeLanguage(lang);
-
-    const isRTL = lang === 'ar';
-    if (I18nManager.isRTL !== isRTL) {
-      I18nManager.allowRTL(isRTL);
-      I18nManager.forceRTL(isRTL);
-      
-      // عمل Reload للتطبيق عشان يعكس اتجاه الشاشة (RTL)
-      Alert.alert(
-        t('restart_required'),
-        t('restart_message'),
-        [{ text: t('restart_now'), onPress: () => Updates.reloadAsync() }]
-      );
-    }
-  };
+  // Removed handleLanguageChange as language is now centralized via TopBar
 
   if (isLoading) {
     return (

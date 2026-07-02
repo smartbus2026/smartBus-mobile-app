@@ -6,13 +6,14 @@ import {
 } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Colors } from '../../constants/theme';
 import { useTheme } from '../../src/context/ThemeContext';
 import api from '../../src/services/api';
 import TopBar from '../../src/components/TopBar';
 
 // ─── CustomSelect ─────────────────────────────────────────────────────────────
-function CustomSelect({ label, value, options, onSelect, placeholder, colors }: any) {
+function CustomSelect({ label, value, options, onSelect, placeholder, colors, t }: any) {
   const [open, setOpen] = useState(false);
   const selectedOption = options.find((o: any) => o.value === value);
 
@@ -41,7 +42,7 @@ function CustomSelect({ label, value, options, onSelect, placeholder, colors }: 
         <View style={{ marginTop: 6, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, overflow: 'hidden' }}>
           <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
             {options.length === 0 ? (
-              <Text style={{ padding: 16, textAlign: 'center', color: colors.icon, fontSize: 12 }}>No options available</Text>
+              <Text style={{ padding: 16, textAlign: 'center', color: colors.icon, fontSize: 12 }}>{t('no_options_available')}</Text>
             ) : (
               options.map((opt: any) => (
                 <TouchableOpacity
@@ -71,6 +72,7 @@ export default function AdminDashboard() {
   const { theme } = useTheme();
   const colors = Colors[theme];
   const router = useRouter();
+  const { t } = useTranslation();
 
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState({
@@ -78,14 +80,14 @@ export default function AdminDashboard() {
     tickets: [] as any[], routesList: [] as any[],
   });
 
-  const [demandDate, setDemandDate]     = useState<'today' | 'tomorrow'>('tomorrow');
-  const [demands, setDemands]           = useState<any[]>([]);
+  const [demandDate, setDemandDate]       = useState<'today' | 'tomorrow'>('tomorrow');
+  const [demands, setDemands]             = useState<any[]>([]);
   const [demandLoading, setDemandLoading] = useState(true);
-  const [filterShift, setFilterShift]   = useState<'morning' | 'return'>('morning');
-  const [filterTime, setFilterTime]     = useState<string>('3:30');
+  const [filterShift, setFilterShift]     = useState<'morning' | 'return'>('morning');
+  const [filterTime, setFilterTime]       = useState<string>('3:30');
 
-  const [buses, setBuses]       = useState<any[]>([]);
-  const [drivers, setDrivers]   = useState<any[]>([]);
+  const [buses, setBuses]         = useState<any[]>([]);
+  const [drivers, setDrivers]     = useState<any[]>([]);
   const [dispatchForm, setDispatchForm] = useState<{ timeSlot: string; specificReturnTime?: string; routeIds: string[] }>({ timeSlot: 'Morning', specificReturnTime: '', routeIds: [] });
   const [assignments, setAssignments]   = useState([{ busId: '', driverId: '' }]);
   const [dispatchLoading, setDispatchLoading] = useState(false);
@@ -119,10 +121,10 @@ export default function AdminDashboard() {
       const bookings = bookingsRes.data?.data || bookingsRes.data || [];
       const supportTickets = supportRes.data?.data?.tickets || supportRes.data?.tickets || [];
       setData({
-        totalStudents:   Array.isArray(users)    ? users.filter((u: any) => u.role === 'student').length : 0,
-        activeTripsCount: Array.isArray(trips)   ? trips.filter((t: any) => t.status === 'active' || t.status === 'in-progress').length : 0,
-        totalRoutes:     Array.isArray(routes)   ? routes.length : 0,
-        totalBookings:   Array.isArray(bookings) ? bookings.length : 0,
+        totalStudents:    Array.isArray(users)    ? users.filter((u: any) => u.role === 'student').length : 0,
+        activeTripsCount: Array.isArray(trips)    ? trips.filter((t: any) => t.status === 'active' || t.status === 'in-progress').length : 0,
+        totalRoutes:      Array.isArray(routes)   ? routes.length : 0,
+        totalBookings:    Array.isArray(bookings) ? bookings.length : 0,
         tickets: supportTickets.filter((t: any) => t.status === 'open' || t.status === 'pending').slice(0, 5),
         routesList: Array.isArray(routes) ? routes : [],
       });
@@ -175,24 +177,24 @@ export default function AdminDashboard() {
   };
 
   const handleGenerateAI = async () => {
-    if (filterShift === 'return' && !filterTime) { alert('Please select a return time before generating a dispatch plan.'); return; }
+    if (filterShift === 'return' && !filterTime) { alert(t('select_return_time_before_generate')); return; }
     setGeneratingAI(true);
     try {
       const targetDate = new Date(); targetDate.setDate(targetDate.getDate() + 1);
       await api.post('/admin/dispatch/generate', { targetDate: targetDate.toISOString().split('T')[0], shift: filterShift, time: filterShift === 'return' ? filterTime : null });
       fetchPendingProposal(filterShift.charAt(0).toUpperCase() + filterShift.slice(1));
-    } catch (err: any) { alert(`AI Engine Notice:\n${err.response?.data?.error || err.response?.data?.message || 'Failed to generate AI proposal.'}`); }
+    } catch (err: any) { alert(`${t('ai_engine_notice')}\n${err.response?.data?.error || err.response?.data?.message || t('failed_generate_ai_proposal')}`); }
     finally { setGeneratingAI(false); }
   };
 
   const handleApproveProposal = async () => {
     const finalAssignments = editMode ? editedAssignments : pendingProposal.assignments;
-    if (finalAssignments.some((a: any) => !a.busId || !a.driverId)) { alert('You MUST assign a physical Bus and Driver to each group.'); if (!editMode) setEditMode(true); return; }
+    if (finalAssignments.some((a: any) => !a.busId || !a.driverId)) { alert(t('must_assign_bus_driver')); if (!editMode) setEditMode(true); return; }
     setProposalLoading(true);
     try {
       await api.post(`/admin/proposals/${pendingProposal._id}/approve`, { assignments: finalAssignments });
       setPendingProposal(null); setEditMode(false); fetchAssignedTrips();
-    } catch (err: any) { alert(err.response?.data?.message || 'Confirmation failed.'); }
+    } catch (err: any) { alert(err.response?.data?.message || t('confirmation_failed')); }
     finally { setProposalLoading(false); }
   };
 
@@ -209,19 +211,19 @@ export default function AdminDashboard() {
   };
 
   const handleDispatch = async () => {
-    if (assignments.some(a => !a.busId || !a.driverId) || dispatchForm.routeIds.length === 0) { setDispatchMessage({ type: 'error', text: 'Select a bus, driver, and at least 1 route.' }); return; }
-    if (dispatchForm.timeSlot === 'Return' && !dispatchForm.specificReturnTime) { setDispatchMessage({ type: 'error', text: 'Select a return time.' }); return; }
+    if (assignments.some(a => !a.busId || !a.driverId) || dispatchForm.routeIds.length === 0) { setDispatchMessage({ type: 'error', text: t('dispatch_validation') }); return; }
+    if (dispatchForm.timeSlot === 'Return' && !dispatchForm.specificReturnTime) { setDispatchMessage({ type: 'error', text: t('dispatch_return_required') }); return; }
     setDispatchLoading(true); setDispatchMessage({ type: '', text: '' });
     try {
       const targetDate = new Date(); if (demandDate === 'tomorrow') targetDate.setDate(targetDate.getDate() + 1);
       const payload: any = { assignments, date: targetDate.toISOString().split('T')[0], timeSlot: dispatchForm.timeSlot, routeIds: dispatchForm.routeIds };
       if (dispatchForm.timeSlot === 'Return') payload.specificReturnTime = dispatchForm.specificReturnTime;
       await api.post('/bookings/admin/dispatch', payload);
-      setDispatchMessage({ type: 'success', text: 'Bus dispatched successfully!' });
+      setDispatchMessage({ type: 'success', text: t('dispatch_success') });
       setDispatchForm({ timeSlot: 'Morning', specificReturnTime: '', routeIds: [] });
       setAssignments([{ busId: '', driverId: '' }]);
       fetchAssignedTrips(); fetchDemands();
-    } catch (err: any) { setDispatchMessage({ type: 'error', text: err.response?.data?.message || 'Dispatch failed.' }); }
+    } catch (err: any) { setDispatchMessage({ type: 'error', text: err.response?.data?.message || t('dispatch_failed') }); }
     finally { setDispatchLoading(false); }
   };
 
@@ -233,7 +235,7 @@ export default function AdminDashboard() {
     if (!pendingProposal) return;
     const interval = setInterval(() => {
       const diff = new Date(pendingProposal.deadline).getTime() - new Date().getTime();
-      if (diff <= 0) { setTimeRemaining('Deadline Passed'); clearInterval(interval); return; }
+      if (diff <= 0) { setTimeRemaining(t('deadline_passed')); clearInterval(interval); return; }
       const h = Math.floor((diff % (1000*60*60*24)) / (1000*60*60));
       const m = Math.floor((diff % (1000*60*60)) / (1000*60));
       const s = Math.floor((diff % (1000*60)) / 1000);
@@ -243,18 +245,18 @@ export default function AdminDashboard() {
   }, [pendingProposal]);
 
   const stats = [
-    { title: 'Total Students',   value: loading ? '...' : data.totalStudents.toLocaleString(),  trend: 'Registered accounts',   icon: <Users   size={22} color={colors.tint} /> },
-    { title: 'Active Trips',     value: loading ? '...' : data.activeTripsCount.toString(),      trend: 'Currently en route',    icon: <Bus     size={22} color={colors.tint} /> },
-    { title: 'Available Routes', value: loading ? '...' : data.totalRoutes.toString(),           trend: 'Active service paths',  icon: <MapPin  size={22} color={colors.tint} /> },
-    { title: 'Total Bookings',   value: loading ? '...' : data.totalBookings.toLocaleString(),   trend: 'System wide',           icon: <Calendar size={22} color={colors.tint} /> },
+    { title: t('total_students'),   value: loading ? '...' : data.totalStudents.toLocaleString(),  trend: t('stat_registered_accounts'),  icon: <Users   size={22} color={colors.tint} /> },
+    { title: t('active_trips'),     value: loading ? '...' : data.activeTripsCount.toString(),      trend: t('stat_currently_en_route'),   icon: <Bus     size={22} color={colors.tint} /> },
+    { title: t('available_routes'), value: loading ? '...' : data.totalRoutes.toString(),           trend: t('stat_active_service_paths'), icon: <MapPin  size={22} color={colors.tint} /> },
+    { title: t('total_bookings'),   value: loading ? '...' : data.totalBookings.toLocaleString(),   trend: t('stat_system_wide'),          icon: <Calendar size={22} color={colors.tint} /> },
   ];
 
-  const busOptions    = buses.map(b   => ({ label: `${b.busCode} (Cap: ${b.capacity || 45})`, value: b._id }));
+  const busOptions    = buses.map(b   => ({ label: `${b.busCode} (${t('cap_label')}: ${b.capacity || 45})`, value: b._id }));
   const driverOptions = drivers.map(d => ({ label: d.name, value: d._id }));
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <TopBar title="Dashboard" showMenu showSettings onSettingsPress={() => router.push('/(admin)/settings' as any)} />
+      <TopBar title={t('dashboard')} showMenu showSettings onSettingsPress={() => router.push('/(admin)/settings' as any)} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
 
@@ -268,15 +270,15 @@ export default function AdminDashboard() {
                 </View>
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: '900', color: '#d97706', textTransform: 'uppercase', letterSpacing: 1 }}>
-                    AI BUS ASSIGNMENT PROPOSAL
+                    {t('ai_proposal_title')}
                   </Text>
                   <Text style={{ fontSize: 10, fontWeight: '700', color: '#92400e', marginTop: 2 }}>
-                    For {pendingProposal.tripType} on {new Date(pendingProposal.targetDate).toDateString()}
+                    {t('ai_proposal_for', { type: pendingProposal.tripType, date: new Date(pendingProposal.targetDate).toDateString() })}
                   </Text>
                 </View>
               </View>
               <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#fde68a' }}>
-                <Text style={{ fontSize: 9, fontWeight: '800', color: '#b45309', textTransform: 'uppercase' }}>Auto-Approve Deadline</Text>
+                <Text style={{ fontSize: 9, fontWeight: '800', color: '#b45309', textTransform: 'uppercase' }}>{t('auto_approve_deadline')}</Text>
                 <Text style={{ fontSize: 13, fontWeight: '900', color: '#92400e' }}>{timeRemaining}</Text>
               </View>
             </View>
@@ -285,22 +287,22 @@ export default function AdminDashboard() {
               {(editMode ? editedAssignments : pendingProposal.assignments).map((assignment: any, idx: number) => (
                 <View key={idx} style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 14 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text }}>Bus {assignment.busNumber}</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text }}>{t('bus_label')} {assignment.busNumber}</Text>
                     <View style={{ backgroundColor: `${colors.tint}1A`, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: `${colors.tint}33` }}>
-                      <Text style={{ fontSize: 11, fontWeight: '800', color: colors.tint }}>{assignment.studentBookings?.length || 0} Students</Text>
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: colors.tint }}>{assignment.studentBookings?.length || 0} {t('students_label')}</Text>
                     </View>
                   </View>
                   {editMode ? (
                     <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
-                      <CustomSelect colors={colors} value={assignment.busId} options={busOptions} placeholder="Choose Bus" onSelect={(val: string) => { const updated = [...editedAssignments]; updated[idx].busId = val; setEditedAssignments(updated); }} />
-                      <CustomSelect colors={colors} value={assignment.driverId} options={driverOptions} placeholder="Choose Driver" onSelect={(val: string) => { const updated = [...editedAssignments]; updated[idx].driverId = val; setEditedAssignments(updated); }} />
+                      <CustomSelect t={t} colors={colors} value={assignment.busId} options={busOptions} placeholder={t('choose_bus')} onSelect={(val: string) => { const updated = [...editedAssignments]; updated[idx].busId = val; setEditedAssignments(updated); }} />
+                      <CustomSelect t={t} colors={colors} value={assignment.driverId} options={driverOptions} placeholder={t('choose_driver')} onSelect={(val: string) => { const updated = [...editedAssignments]; updated[idx].driverId = val; setEditedAssignments(updated); }} />
                     </View>
                   ) : (
                     <ScrollView style={{ maxHeight: 150 }} nestedScrollEnabled>
                       {assignment.studentBookings?.map((booking: any, bIdx: number) => (
                         <View key={bIdx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: `${colors.border}60` }}>
-                          <Text style={{ fontSize: 12, color: colors.text, flex: 1, fontWeight: '500' }} numberOfLines={1}>{booking.user?.name || 'Unknown'}</Text>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.icon }}>{booking.route?.name || 'No Route'}</Text>
+                          <Text style={{ fontSize: 12, color: colors.text, flex: 1, fontWeight: '500' }} numberOfLines={1}>{booking.user?.name || t('unknown_student')}</Text>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.icon }}>{booking.route?.name || t('unknown_route')}</Text>
                         </View>
                       ))}
                     </ScrollView>
@@ -314,22 +316,22 @@ export default function AdminDashboard() {
                 <>
                   <TouchableOpacity onPress={() => { setEditMode(false); setEditedAssignments(pendingProposal.assignments); }}
                     style={{ flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}>
-                    <Text style={{ fontSize: 12, fontWeight: '900', textTransform: 'uppercase', color: colors.text }}>Cancel</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '900', textTransform: 'uppercase', color: colors.text }}>{t('cancel')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={handleSaveEdits} disabled={proposalLoading}
                     style={{ flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: '#f59e0b' }}>
-                    <Text style={{ fontSize: 12, fontWeight: '900', color: '#fff' }}>{proposalLoading ? 'Saving...' : 'Save Modifications'}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '900', color: '#fff' }}>{proposalLoading ? t('saving') : t('save_modifications')}</Text>
                   </TouchableOpacity>
                 </>
               ) : (
                 <>
                   <TouchableOpacity onPress={() => setEditMode(true)}
                     style={{ flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}>
-                    <Text style={{ fontSize: 12, fontWeight: '900', textTransform: 'uppercase', color: colors.text }}>Modify</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '900', textTransform: 'uppercase', color: colors.text }}>{t('modify')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={handleApproveProposal} disabled={proposalLoading}
                     style={{ flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.success || '#10b981' }}>
-                    <Text style={{ fontSize: 12, fontWeight: '900', color: '#fff' }}>Confirm AI Mapping</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '900', color: '#fff' }}>{t('confirm_ai_mapping')}</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -358,13 +360,15 @@ export default function AdminDashboard() {
           <View style={{ padding: 18, borderBottomWidth: 1, borderBottomColor: colors.border, gap: 14 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text style={{ fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>
-                LIVE BOOKING DEMANDS
+                {t('live_booking_demands')}
               </Text>
               <View style={{ flexDirection: 'row', backgroundColor: colors.background, padding: 4, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
                 {(['today', 'tomorrow'] as const).map(d => (
                   <TouchableOpacity key={d} onPress={() => setDemandDate(d)}
                     style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: demandDate === d ? colors.tint : 'transparent' }}>
-                    <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: demandDate === d ? '#000' : colors.icon }}>{d}</Text>
+                    <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: demandDate === d ? '#000' : colors.icon }}>
+                      {d === 'today' ? t('today') : t('tomorrow')}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -373,7 +377,7 @@ export default function AdminDashboard() {
             <TouchableOpacity activeOpacity={0.8} onPress={handleGenerateAI} disabled={generatingAI}
               style={{ backgroundColor: '#d97706', minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 14, opacity: generatingAI ? 0.6 : 1 }}>
               <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1.5 }}>
-                {generatingAI ? 'CONFIGURING...' : 'GENERATE AUTO-ASSIGN'}
+                {generatingAI ? t('configuring') : t('generate_auto_assign')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -382,17 +386,19 @@ export default function AdminDashboard() {
             {(['morning', 'return'] as const).map(s => (
               <TouchableOpacity key={s} onPress={() => setFilterShift(s)}
                 style={{ flex: 1, minHeight: 44, justifyContent: 'center', alignItems: 'center', borderRadius: 10, backgroundColor: filterShift === s ? colors.tint : 'transparent' }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase', color: filterShift === s ? '#000' : colors.text }}>{s}</Text>
+                <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase', color: filterShift === s ? '#000' : colors.text }}>
+                  {s === 'morning' ? t('morning') : t('return')}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
 
           {filterShift === 'return' && (
             <View style={{ flexDirection: 'row', padding: 12, gap: 8, justifyContent: 'center' }}>
-              {['3:30', '7:00'].map(t => (
-                <TouchableOpacity key={t} onPress={() => setFilterTime(t)}
-                  style={{ minWidth: 100, minHeight: 40, justifyContent: 'center', alignItems: 'center', borderRadius: 10, borderWidth: 1, borderColor: filterTime === t ? colors.tint : colors.border, backgroundColor: filterTime === t ? `${colors.tint}1A` : colors.background }}>
-                  <Text style={{ fontSize: 12, fontWeight: '800', color: filterTime === t ? colors.tint : colors.text }}>{t} PM</Text>
+              {['3:30', '7:00'].map(time => (
+                <TouchableOpacity key={time} onPress={() => setFilterTime(time)}
+                  style={{ minWidth: 100, minHeight: 40, justifyContent: 'center', alignItems: 'center', borderRadius: 10, borderWidth: 1, borderColor: filterTime === time ? colors.tint : colors.border, backgroundColor: filterTime === time ? `${colors.tint}1A` : colors.background }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: filterTime === time ? colors.tint : colors.text }}>{time} PM</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -403,7 +409,7 @@ export default function AdminDashboard() {
           ) : demands.length === 0 ? (
             <View style={{ padding: 40, alignItems: 'center', opacity: 0.5 }}>
               <Calendar size={32} color={colors.icon} style={{ marginBottom: 12 }} />
-              <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>No Pending Demands</Text>
+              <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>{t('no_pending_demands')}</Text>
             </View>
           ) : (
             <View style={{ padding: 16, gap: 14 }}>
@@ -422,12 +428,12 @@ export default function AdminDashboard() {
                         <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text, flex: 1 }}>{d.routeName}</Text>
                         {isHigh && (
                           <View style={{ backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)' }}>
-                            <Text style={{ fontSize: 9, fontWeight: '900', color: '#ef4444', letterSpacing: 1 }}>OVERLOADED</Text>
+                            <Text style={{ fontSize: 9, fontWeight: '900', color: '#ef4444', letterSpacing: 1 }}>{t('overloaded')}</Text>
                           </View>
                         )}
                       </View>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <Text style={{ fontSize: 12, color: colors.icon, fontWeight: '600' }}>Booked</Text>
+                        <Text style={{ fontSize: 12, color: colors.icon, fontWeight: '600' }}>{t('booked')}</Text>
                         <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text }}>{d.totalStudents} <Text style={{ color: colors.icon }}>/ 45</Text></Text>
                       </View>
                       <View style={{ height: 8, backgroundColor: colors.border, borderRadius: 4, overflow: 'hidden' }}>
@@ -444,18 +450,18 @@ export default function AdminDashboard() {
         {/* ── 4. Assign Bus & Dispatch ── */}
         <View style={{ borderRadius: 24, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, marginBottom: 24, padding: 20 }}>
           <Text style={{ fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text, marginBottom: 20 }}>
-            ASSIGN BUS & DISPATCH
+            {t('assign_bus_dispatch')}
           </Text>
 
           <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.5, color: colors.icon, marginBottom: 10 }}>
-            Assign Buses & Drivers
+            {t('assign_buses_drivers')}
           </Text>
 
           {assignments.map((assignment, index) => (
             <View key={index} style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 16, marginBottom: 12 }}>
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                <CustomSelect colors={colors} value={assignment.busId} options={busOptions} placeholder="Choose Bus" onSelect={(val: string) => { const next = [...assignments]; next[index].busId = val; setAssignments(next); }} />
-                <CustomSelect colors={colors} value={assignment.driverId} options={driverOptions} placeholder="Choose Driver" onSelect={(val: string) => { const next = [...assignments]; next[index].driverId = val; setAssignments(next); }} />
+                <CustomSelect t={t} colors={colors} value={assignment.busId} options={busOptions} placeholder={t('choose_bus')} onSelect={(val: string) => { const next = [...assignments]; next[index].busId = val; setAssignments(next); }} />
+                <CustomSelect t={t} colors={colors} value={assignment.driverId} options={driverOptions} placeholder={t('choose_driver')} onSelect={(val: string) => { const next = [...assignments]; next[index].driverId = val; setAssignments(next); }} />
               </View>
               {index > 0 && (
                 <TouchableOpacity activeOpacity={0.6} onPress={() => setAssignments(assignments.filter((_, i) => i !== index))} style={{ alignSelf: 'flex-end', marginTop: 8 }}>
@@ -466,15 +472,17 @@ export default function AdminDashboard() {
           ))}
 
           <TouchableOpacity activeOpacity={0.7} onPress={() => setAssignments([...assignments, { busId: '', driverId: '' }])} style={{ marginBottom: 20 }}>
-            <Text style={{ fontSize: 12, fontWeight: '900', color: colors.tint }}>+ Add Another Bus</Text>
+            <Text style={{ fontSize: 12, fontWeight: '900', color: colors.tint }}>+ {t('add_another_bus')}</Text>
           </TouchableOpacity>
 
-          <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.5, color: colors.icon, marginBottom: 10 }}>Time Slot</Text>
+          <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.5, color: colors.icon, marginBottom: 10 }}>{t('time_slot')}</Text>
           <View style={{ flexDirection: 'row', gap: 10, marginBottom: dispatchForm.timeSlot === 'Return' ? 12 : 20 }}>
             {['Morning', 'Return'].map(slot => (
               <TouchableOpacity key={slot} activeOpacity={0.7} onPress={() => setDispatchForm(prev => ({ ...prev, timeSlot: slot, specificReturnTime: '' }))}
                 style={{ flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: dispatchForm.timeSlot === slot ? colors.tint : colors.border, backgroundColor: dispatchForm.timeSlot === slot ? `${colors.tint}1A` : colors.background }}>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: dispatchForm.timeSlot === slot ? colors.tint : colors.text }}>{slot}</Text>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: dispatchForm.timeSlot === slot ? colors.tint : colors.text }}>
+                  {slot === 'Morning' ? t('morning') : t('return')}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -490,7 +498,7 @@ export default function AdminDashboard() {
             </View>
           )}
 
-          <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.5, color: colors.icon, marginBottom: 10 }}>Select Target Routes</Text>
+          <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.5, color: colors.icon, marginBottom: 10 }}>{t('select_target_routes')}</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
             {data.routesList.map(r => {
               const isSelected = dispatchForm.routeIds.includes(r._id);
@@ -512,7 +520,7 @@ export default function AdminDashboard() {
           <TouchableOpacity activeOpacity={0.8} onPress={handleDispatch} disabled={dispatchLoading}
             style={{ backgroundColor: colors.tint, minHeight: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', opacity: dispatchLoading ? 0.7 : 1 }}>
             <Text style={{ color: '#000', fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1.5 }}>
-              {dispatchLoading ? 'DISPATCHING...' : 'ASSIGN BUS & NOTIFY'}
+              {dispatchLoading ? t('dispatching') : t('assign_bus_notify')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -520,26 +528,26 @@ export default function AdminDashboard() {
         {/* ── 5. Pending Tickets ── */}
         <View style={{ borderRadius: 24, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, marginBottom: 24, overflow: 'hidden' }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 18, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <Text style={{ fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>PENDING TICKETS</Text>
+            <Text style={{ fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>{t('pending_tickets')}</Text>
             <TouchableOpacity onPress={() => router.push('/(admin)/support' as any)}>
-              <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.tint }}>VIEW ALL</Text>
+              <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.tint }}>{t('view_all')}</Text>
             </TouchableOpacity>
           </View>
           <View style={{ padding: 12 }}>
             {loading ? (
               <ActivityIndicator style={{ padding: 20 }} color={colors.tint} />
             ) : data.tickets.length === 0 ? (
-              <Text style={{ fontSize: 12, color: colors.icon, textAlign: 'center', padding: 20 }}>No pending tickets.</Text>
+              <Text style={{ fontSize: 12, color: colors.icon, textAlign: 'center', padding: 20 }}>{t('no_pending_tickets')}</Text>
             ) : (
-              data.tickets.map((t, i) => (
-                <View key={t._id || i} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderRadius: 16, backgroundColor: colors.background, marginBottom: 10 }}>
+              data.tickets.map((tkt, i) => (
+                <View key={tkt._id || i} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderRadius: 16, backgroundColor: colors.background, marginBottom: 10 }}>
                   <View style={{ flex: 1, paddingRight: 12 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text, marginBottom: 4 }}>{t.subject}</Text>
-                    <Text style={{ fontSize: 11, color: colors.icon }} numberOfLines={1}>{t.description}</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text, marginBottom: 4 }}>{tkt.subject}</Text>
+                    <Text style={{ fontSize: 11, color: colors.icon }} numberOfLines={1}>{tkt.description}</Text>
                   </View>
-                  <TouchableOpacity onPress={() => handleResolveTicket(t._id)}
+                  <TouchableOpacity onPress={() => handleResolveTicket(tkt._id)}
                     style={{ backgroundColor: `${colors.success || '#10b981'}1A`, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: `${colors.success || '#10b981'}33` }}>
-                    <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: colors.success || '#10b981' }}>RESOLVE</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, color: colors.success || '#10b981' }}>{t('resolve')}</Text>
                   </TouchableOpacity>
                 </View>
               ))
@@ -549,7 +557,7 @@ export default function AdminDashboard() {
 
         {/* ── 6. Today's Trips ── */}
         <Text style={{ fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text, marginBottom: 14 }}>
-          TODAY'S TRIPS
+          {t('todays_trips')}
         </Text>
 
         <View style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 12, marginBottom: 16, gap: 10 }}>
@@ -557,7 +565,9 @@ export default function AdminDashboard() {
             {(['Morning', 'Return'] as const).map(s => (
               <TouchableOpacity key={s} onPress={() => { setSelectedShift(s); setSelectedTime(''); }}
                 style={{ flex: 1, minHeight: 44, justifyContent: 'center', alignItems: 'center', borderRadius: 10, borderWidth: 1, borderColor: selectedShift === s ? colors.tint : colors.border, backgroundColor: selectedShift === s ? `${colors.tint}1A` : 'transparent' }}>
-                <Text style={{ fontSize: 12, fontWeight: '800', color: selectedShift === s ? colors.tint : colors.text }}>{s}</Text>
+                <Text style={{ fontSize: 12, fontWeight: '800', color: selectedShift === s ? colors.tint : colors.text }}>
+                  {s === 'Morning' ? t('morning') : t('return')}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -567,7 +577,9 @@ export default function AdminDashboard() {
               {['', '3:30 PM', '7:00 PM'].map((rt, i) => (
                 <TouchableOpacity key={i} onPress={() => setSelectedTime(rt)}
                   style={{ paddingHorizontal: 16, minHeight: 38, justifyContent: 'center', borderRadius: 10, borderWidth: 1, borderColor: selectedTime === rt ? colors.tint : colors.border, backgroundColor: selectedTime === rt ? `${colors.tint}1A` : 'transparent', marginRight: 8 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: selectedTime === rt ? colors.tint : colors.text }}>{rt === '' ? 'Any Time' : rt}</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: selectedTime === rt ? colors.tint : colors.text }}>
+                    {rt === '' ? t('any_return') : rt}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -576,29 +588,29 @@ export default function AdminDashboard() {
 
         <View style={{ borderRadius: 24, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, overflow: 'hidden', marginBottom: 16 }}>
           <View style={{ flexDirection: 'row', padding: 16, backgroundColor: `${colors.background}80`, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <Text style={{ flex: 2, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.icon }}>Route</Text>
-            <Text style={{ flex: 1.5, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.icon }}>Bus & Driver</Text>
+            <Text style={{ flex: 2, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.icon }}>{t('table_route')}</Text>
+            <Text style={{ flex: 1.5, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.icon }}>{t('bus_and_driver')}</Text>
           </View>
           {tripsLoading ? (
             <ActivityIndicator style={{ padding: 30 }} size="large" color={colors.tint} />
           ) : (() => {
-            const filteredTrips = assignedTrips.filter(t =>
-              t.timeSlot === selectedShift &&
-              (!selectedTime || t.specificReturnTime === selectedTime) &&
-              (!tripRouteFilter || t.route?._id === tripRouteFilter)
+            const filteredTrips = assignedTrips.filter(trip =>
+              trip.timeSlot === selectedShift &&
+              (!selectedTime || trip.specificReturnTime === selectedTime) &&
+              (!tripRouteFilter || trip.route?._id === tripRouteFilter)
             );
             if (filteredTrips.length === 0) {
-              return <Text style={{ fontSize: 12, fontWeight: '600', color: colors.icon, textAlign: 'center', padding: 30 }}>No trips match filters.</Text>;
+              return <Text style={{ fontSize: 12, fontWeight: '600', color: colors.icon, textAlign: 'center', padding: 30 }}>{t('no_trips_match_filters')}</Text>;
             }
             return filteredTrips.map((trip, i) => (
               <View key={i} style={{ flexDirection: 'row', alignItems: 'center', padding: 18, borderBottomWidth: i === filteredTrips.length - 1 ? 0 : 1, borderBottomColor: colors.border }}>
                 <View style={{ flex: 2, gap: 4 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text }} numberOfLines={1}>{trip.route?.name || 'System Route'}</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text }} numberOfLines={1}>{trip.route?.name || t('unknown_route')}</Text>
                   <Text style={{ fontSize: 10, fontWeight: '600', color: colors.icon }}>{trip.timeSlot} {trip.specificReturnTime ? `(${trip.specificReturnTime})` : ''}</Text>
                 </View>
                 <View style={{ flex: 1.5 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '900', color: colors.tint }}>{trip.busNumber || trip.bus?.busCode || 'Unassigned'}</Text>
-                  <Text style={{ fontSize: 10, fontWeight: '600', color: colors.icon }} numberOfLines={1}>{trip.driverName || 'No Driver'}</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '900', color: colors.tint }}>{trip.busNumber || trip.bus?.busCode || t('unassigned')}</Text>
+                  <Text style={{ fontSize: 10, fontWeight: '600', color: colors.icon }} numberOfLines={1}>{trip.driverName || t('no_driver_assigned')}</Text>
                 </View>
               </View>
             ));

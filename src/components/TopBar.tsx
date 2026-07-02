@@ -2,10 +2,11 @@ import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Menu, Settings } from 'lucide-react-native';
 import React from 'react';
-import { I18nManager, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useThemeColor } from '../../constants/theme';
+import { changeAppLanguage } from '../i18n/index';
 
 interface TopBarProps {
   title: string;
@@ -31,8 +32,7 @@ export default function TopBar({
 
   const toggleLang = async () => {
     const next = isAr ? 'en' : 'ar';
-    await i18n.changeLanguage(next);
-    I18nManager.forceRTL(next === 'ar');
+    await changeAppLanguage(next);
   };
 
   const handleMenu = () => {

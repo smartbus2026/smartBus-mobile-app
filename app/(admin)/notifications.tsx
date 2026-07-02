@@ -14,6 +14,7 @@ import { Colors } from '../../constants/theme';
 import { useTheme } from '../../src/context/ThemeContext';
 import api from '../../src/services/api';
 import TopBar from '../../src/components/TopBar';
+import { isCurrentLanguageRTL } from '../../src/i18n';
 
 interface Notification {
   _id: string; title: string; message: string;
@@ -62,6 +63,7 @@ const SectionCard: React.FC<{
 export default function NotificationsScreen() {
   const { theme } = useTheme();
   const colors = Colors[theme];
+  const isRTL = isCurrentLanguageRTL();
   const router = useRouter();
 
   const [activeTab, setActiveTab]       = useState<'inbox' | 'compose'>('inbox');
@@ -367,7 +369,7 @@ export default function NotificationsScreen() {
                       borderWidth: 1, borderRadius: 20, padding: 16,
                       backgroundColor: colors.background, borderColor: colors.border, overflow: 'hidden',
                     }}>
-                      <View style={{ position: 'absolute', top: 0, right: 0, backgroundColor: colors.card, borderLeftWidth: 1, borderBottomWidth: 1, borderColor: colors.border, borderBottomLeftRadius: 12, paddingHorizontal: 10, paddingVertical: 4 }}>
+                      <View style={[{ position: 'absolute', top: 0, backgroundColor: colors.card, borderBottomWidth: 1, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 4 }, isRTL ? { left: 0, borderRightWidth: 1, borderBottomRightRadius: 12 } : { right: 0, borderLeftWidth: 1, borderBottomLeftRadius: 12 }]}>
                         <Text style={{ fontSize: 8, fontWeight: '900', color: colors.icon }}>{notif.id}</Text>
                       </View>
                       <View style={{ flexDirection: 'row', gap: 14 }}>

@@ -105,7 +105,7 @@ export default function DriverSettingsPage() {
   const colors = Colors[theme];
   const { t } = useTranslation();
 
-  const [loading, setLoading]           = useState(true);
+  const [loading, setLoading]            = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPass, setSavingPass]       = useState(false);
   const [toast, setToast]                 = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
@@ -215,7 +215,7 @@ export default function DriverSettingsPage() {
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
 
-        {/* Header */}
+        {/* ── Header ── */}
         <View style={{ marginBottom: 24 }}>
           <Text style={{ fontSize: 22, fontWeight: '900', textTransform: 'uppercase', letterSpacing: -0.5, color: colors.text }}>
             {t('settings_title_part1').toUpperCase()}{' '}
@@ -226,7 +226,7 @@ export default function DriverSettingsPage() {
           </Text>
         </View>
 
-        {/* Avatar */}
+        {/* ── Avatar ── */}
         <View style={{ alignItems: 'center', marginBottom: 24 }}>
           <View style={{
             width: 80, height: 80, borderRadius: 28, alignItems: 'center', justifyContent: 'center',
@@ -245,20 +245,49 @@ export default function DriverSettingsPage() {
           </View>
         </View>
 
-        {/* ── 1. Profile ── */}
+        {/* ── 1. Profile Info ── */}
         <SectionCard
           icon={<User size={22} color={colors.tint} />}
           title={t('my_profile')}
           subtitle={t('personal_information')}
           colors={colors}
         >
-          <Field label={t('full_name')}  value={profile.name}  onChange={v => setProfile({ ...profile, name: v })}  placeholder={t('your_name')}  colors={colors} />
-          <Field label={t('email')}      value={profile.email} onChange={() => {}} editable={false} colors={colors} />
-          <Field label={t('phone')}      value={profile.phone} onChange={v => setProfile({ ...profile, phone: v })} placeholder="+20 1xx" colors={colors} />
+          <Field
+            label={t('full_name')}
+            value={profile.name}
+            onChange={v => setProfile({ ...profile, name: v })}
+            placeholder={t('your_name')}
+            colors={colors}
+          />
+          <Field
+            label={t('email')}
+            value={profile.email}
+            onChange={() => {}}
+            editable={false}
+            colors={colors}
+          />
+          <Field
+            label={t('phone')}
+            value={profile.phone}
+            onChange={v => setProfile({ ...profile, phone: v })}
+            placeholder="+20 1xx"
+            colors={colors}
+          />
           {profile.licenseNumber !== '' && (
-            <Field label={t('license_no')} value={profile.licenseNumber} onChange={() => {}} editable={false} colors={colors} />
+            <Field
+              label={t('license_no')}
+              value={profile.licenseNumber}
+              onChange={() => {}}
+              editable={false}
+              colors={colors}
+            />
           )}
-          <SaveBtn onPress={handleSaveProfile} loading={savingProfile} label={t('save_profile')} colors={colors} />
+          <SaveBtn
+            onPress={handleSaveProfile}
+            loading={savingProfile}
+            label={t('save_profile')}
+            colors={colors}
+          />
         </SectionCard>
 
         {/* ── 2. Password ── */}
@@ -269,22 +298,56 @@ export default function DriverSettingsPage() {
           colors={colors}
         >
           <Field
-            label={t('current_password')} value={passForm.current} secureTextEntry={!showCurrent}
-            onChange={v => setPassForm({ ...passForm, current: v })} placeholder="••••••••" colors={colors}
-            rightIcon={<TouchableOpacity onPress={() => setShowCurrent(!showCurrent)}>{showCurrent ? <Eye size={16} color={colors.icon} /> : <EyeOff size={16} color={colors.icon} />}</TouchableOpacity>}
+            label={t('current_password')}
+            value={passForm.current}
+            secureTextEntry={!showCurrent}
+            onChange={v => setPassForm({ ...passForm, current: v })}
+            placeholder="••••••••"
+            colors={colors}
+            rightIcon={
+              <TouchableOpacity onPress={() => setShowCurrent(!showCurrent)}>
+                {showCurrent
+                  ? <Eye    size={16} color={colors.icon} />
+                  : <EyeOff size={16} color={colors.icon} />
+                }
+              </TouchableOpacity>
+            }
           />
           <Field
-            label={t('new_password')} value={passForm.newPass} secureTextEntry={!showNew}
-            onChange={v => setPassForm({ ...passForm, newPass: v })} placeholder="••••••••" colors={colors}
-            rightIcon={<TouchableOpacity onPress={() => setShowNew(!showNew)}>{showNew ? <Eye size={16} color={colors.icon} /> : <EyeOff size={16} color={colors.icon} />}</TouchableOpacity>}
+            label={t('new_password')}
+            value={passForm.newPass}
+            secureTextEntry={!showNew}
+            onChange={v => setPassForm({ ...passForm, newPass: v })}
+            placeholder="••••••••"
+            colors={colors}
+            rightIcon={
+              <TouchableOpacity onPress={() => setShowNew(!showNew)}>
+                {showNew
+                  ? <Eye    size={16} color={colors.icon} />
+                  : <EyeOff size={16} color={colors.icon} />
+                }
+              </TouchableOpacity>
+            }
           />
           <Field
-            label={t('confirm_password')} value={passForm.confirm} secureTextEntry={!showConfirm}
-            onChange={v => setPassForm({ ...passForm, confirm: v })} placeholder="••••••••" colors={colors}
-            rightIcon={<TouchableOpacity onPress={() => setShowConfirm(!showConfirm)}>{showConfirm ? <Eye size={16} color={colors.icon} /> : <EyeOff size={16} color={colors.icon} />}</TouchableOpacity>}
+            label={t('confirm_password')}
+            value={passForm.confirm}
+            secureTextEntry={!showConfirm}
+            onChange={v => setPassForm({ ...passForm, confirm: v })}
+            placeholder="••••••••"
+            colors={colors}
+            rightIcon={
+              <TouchableOpacity onPress={() => setShowConfirm(!showConfirm)}>
+                {showConfirm
+                  ? <Eye    size={16} color={colors.icon} />
+                  : <EyeOff size={16} color={colors.icon} />
+                }
+              </TouchableOpacity>
+            }
           />
           <TouchableOpacity
-            onPress={handleUpdatePassword} disabled={savingPass}
+            onPress={handleUpdatePassword}
+            disabled={savingPass}
             style={{
               flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
               paddingVertical: 14, borderRadius: 14, marginTop: 8, borderWidth: 1,
@@ -294,14 +357,22 @@ export default function DriverSettingsPage() {
           >
             {savingPass
               ? <ActivityIndicator size="small" color={colors.tint} />
-              : <><Lock size={16} color={colors.text} /><Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: colors.text }}>{t('change_password').toUpperCase()}</Text></>
+              : <>
+                  <Lock size={16} color={colors.text} />
+                  <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: colors.text }}>
+                    {t('change_password').toUpperCase()}
+                  </Text>
+                </>
             }
           </TouchableOpacity>
         </SectionCard>
 
         {/* ── 3. Theme ── */}
         <SectionCard
-          icon={theme === 'dark' ? <Moon size={22} color={colors.icon} /> : <Sun size={22} color={colors.icon} />}
+          icon={theme === 'dark'
+            ? <Moon size={22} color={colors.icon} />
+            : <Sun  size={22} color={colors.icon} />
+          }
           title={t('preferences')}
           subtitle={t('interface_appearance')}
           colors={colors}

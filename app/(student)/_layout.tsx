@@ -12,6 +12,7 @@ import { router, usePathname } from "expo-router";
 import { useAuth } from "../../src/context/AuthContext";
 import { Colors } from "../../constants/theme";
 import { useTheme } from "../../src/context/ThemeContext";
+import { isCurrentLanguageRTL } from "../../src/i18n";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Chatbot from "../../src/components/Chatbot";
 
@@ -37,6 +38,7 @@ function StudentDrawerContent(props: any) {
   const { logout } = useAuth();
   const insets = useSafeAreaInsets();
   const current = props.state?.routeNames[props.state?.index];
+  const isRTL = isCurrentLanguageRTL();
 
   const handleLogout = async () => {
     await logout();
@@ -110,11 +112,11 @@ function StudentDrawerContent(props: any) {
                 }}
               >
                 {isActive && (
-                  <View style={{
-                    position: 'absolute', left: 0,
+                  <View style={[{
+                    position: 'absolute',
                     width: 3, height: 20, borderRadius: 2,
                     backgroundColor: colors.tint,
-                  }} />
+                  }, isRTL ? { right: 0 } : { left: 0 }]} />
                 )}
                 <Icon size={18} color={isActive ? colors.tint : colors.icon} />
                 <Text style={{

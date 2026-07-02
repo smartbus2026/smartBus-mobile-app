@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 import { useThemeColor } from "../../constants/theme";
 import { useAuth } from "../../src/context/AuthContext";
+import { isCurrentLanguageRTL } from "../../src/i18n";
 
 const ADMIN_NAV = [
   { name: "dashboard",     labelKey: "nav_dashboard",     icon: LayoutGrid },
@@ -84,7 +85,15 @@ function AdminDrawerContent(props: any) {
               >
                 <Icon size={18} color={isActive ? colors.tint : colors.icon} />
                 <Text style={{ fontSize: 13, fontWeight: "700", color: isActive ? colors.tint : colors.icon }}>{t(item.labelKey)}</Text>
-                {isActive && <View style={{ position: "absolute", left: 0, width: 3, height: 20, borderRadius: 2, backgroundColor: colors.tint }} />}
+                {isActive && (
+                  <View
+                    style={{
+                      position: "absolute",
+                      ...(isCurrentLanguageRTL() ? { right: 0 } : { left: 0 }),
+                      width: 3, height: 20, borderRadius: 2, backgroundColor: colors.tint,
+                    }}
+                  />
+                )}
               </TouchableOpacity>
             );
           })}

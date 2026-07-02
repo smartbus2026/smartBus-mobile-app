@@ -10,6 +10,7 @@ import {
   Plus, Search, Shield, Trash2, User as UserIcon, Users, X,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Colors } from '../../constants/theme';
 import { useTheme } from '../../src/context/ThemeContext';
 import api from '../../src/services/api';
@@ -27,8 +28,8 @@ interface AddUserForm {
 
 // ─── Add User Modal ───────────────────────────────────────────────────────────
 const AddUserModal: React.FC<{
-  colors: any; onClose: () => void; onSuccess: () => void; setToast: (t: any) => void;
-}> = ({ colors, onClose, onSuccess, setToast }) => {
+  colors: any; onClose: () => void; onSuccess: () => void; setToast: (t: any) => void; t: any;
+}> = ({ colors, onClose, onSuccess, setToast, t }) => {
   const [form, setForm] = useState<AddUserForm>({ fullName: '', email: '', password: '', confirmPassword: '', phone_number: '', student_id: '', role: 'student' });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm]   = useState(false);
@@ -38,11 +39,11 @@ const AddUserModal: React.FC<{
 
   const validate = () => {
     const e: Partial<Record<keyof AddUserForm, string>> = {};
-    if (!form.fullName.trim())     e.fullName      = 'Name is required';
-    if (!form.email.includes('@')) e.email         = 'Valid email required';
-    if (form.password.length < 6)  e.password      = 'Min 6 characters';
-    if (form.password !== form.confirmPassword) e.confirmPassword = 'Passwords do not match';
-    if (!form.phone_number.trim()) e.phone_number  = 'Phone is required';
+    if (!form.fullName.trim())     e.fullName      = t('validation_name_required');
+    if (!form.email.includes('@')) e.email         = t('validation_email_required');
+    if (form.password.length < 6)  e.password      = t('validation_min_6');
+    if (form.password !== form.confirmPassword) e.confirmPassword = t('validation_passwords_match');
+    if (!form.phone_number.trim()) e.phone_number  = t('validation_phone_required');
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -54,10 +55,10 @@ const AddUserModal: React.FC<{
       const payload: Record<string, any> = { name: form.fullName, email: form.email, password: form.password, role: form.role, phone_number: form.phone_number };
       if ((form.role === 'student' || form.role === 'driver') && form.student_id) payload.student_id = form.student_id;
       await api.post('/auth/register', payload);
-      setToast({ msg: 'User added successfully', type: 'success' });
+      setToast({ msg: t('user_added'), type: 'success' });
       onSuccess(); onClose();
     } catch (error: any) {
-      setServerError(error.response?.data?.message || error.response?.data?.error || 'Registration failed');
+      setServerError(error.response?.data?.message || error.response?.data?.error || t('registration_failed'));
     } finally { setLoading(false); }
   };
 
@@ -85,9 +86,9 @@ const AddUserModal: React.FC<{
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 24, borderBottomWidth: 1, borderBottomColor: colors.border }}>
             <View>
               <Text style={{ fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>
-                ADD{' '}<Text style={{ color: colors.tint }}>USER</Text>
+                {t('add_user_title_part1')}{' '}<Text style={{ color: colors.tint }}>{t('add_user_title_part2')}</Text>
               </Text>
-              <Text style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginTop: 2 }}>CREATE A NEW ACCOUNT</Text>
+              <Text style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginTop: 2 }}>{t('create_new_account')}</Text>
             </View>
             <TouchableOpacity onPress={onClose}
               style={{ width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}>
@@ -107,29 +108,37 @@ const AddUserModal: React.FC<{
               {(['student', 'admin', 'driver'] as const).map(key => (
                 <TouchableOpacity key={key} onPress={() => setForm({ ...form, role: key })}
                   style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 12, backgroundColor: form.role === key ? colors.tint : 'transparent' }}>
-                  <Text style={{ fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: form.role === key ? '#000' : colors.icon }}>{key}</Text>
+                  <Text style={{ fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: form.role === key ? '#000' : colors.icon }}>{t(key)}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <FieldInput label="Full Name" value={form.fullName} onChange={v => setForm({ ...form, fullName: v })} placeholder="e.g. Ahmed Mohamed" error={errors.fullName} icon={<UserIcon size={15} color={colors.icon} />} />
-            <FieldInput label="Institutional Email" value={form.email} onChange={v => setForm({ ...form, email: v })} placeholder="name@university.edu" error={errors.email} icon={<Mail size={15} color={colors.icon} />} keyboardType="email-address" />
+            <FieldInput label={t('full_name')} value={form.fullName} onChange={v => setForm({ ...form, fullName: v })} placeholder={t('placeholder_full_name')} error={errors.fullName} icon={<UserIcon size={15} color={colors.icon} />} />
+            <FieldInput label={t('institutional_email')} value={form.email} onChange={v => setForm({ ...form, email: v })} placeholder={t('email_placeholder')} error={errors.email} icon={<Mail size={15} color={colors.icon} />} keyboardType="email-address" />
 
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <View style={{ flex: 1 }}>
-                <FieldInput label="Phone" value={form.phone_number} onChange={v => setForm({ ...form, phone_number: v })} placeholder="01xxxxxxxxx" error={errors.phone_number} icon={<Phone size={15} color={colors.icon} />} keyboardType="phone-pad" />
+                <FieldInput label={t('phone')} value={form.phone_number} onChange={v => setForm({ ...form, phone_number: v })} placeholder="01xxxxxxxxx" error={errors.phone_number} icon={<Phone size={15} color={colors.icon} />} keyboardType="phone-pad" />
               </View>
               {(form.role === 'student' || form.role === 'driver') && (
                 <View style={{ flex: 1 }}>
-                  <FieldInput label={form.role === 'student' ? 'Student ID' : 'Driver ID'} value={form.student_id} onChange={v => setForm({ ...form, student_id: v })} placeholder="ID Number" error={errors.student_id} icon={<Hash size={15} color={colors.icon} />} keyboardType="numeric" />
+                  <FieldInput
+                    label={form.role === 'student' ? t('student_id') : t('driver_id')}
+                    value={form.student_id}
+                    onChange={v => setForm({ ...form, student_id: v })}
+                    placeholder={t('id_number')}
+                    error={errors.student_id}
+                    icon={<Hash size={15} color={colors.icon} />}
+                    keyboardType="numeric"
+                  />
                 </View>
               )}
             </View>
 
-            <FieldInput label="Password" value={form.password} onChange={v => setForm({ ...form, password: v })} placeholder="••••••••" error={errors.password} secureTextEntry={!showPassword} icon={<Lock size={15} color={colors.icon} />}
+            <FieldInput label={t('password')} value={form.password} onChange={v => setForm({ ...form, password: v })} placeholder="••••••••" error={errors.password} secureTextEntry={!showPassword} icon={<Lock size={15} color={colors.icon} />}
               rightIcon={<TouchableOpacity onPress={() => setShowPassword(!showPassword)}>{showPassword ? <Eye size={15} color={colors.icon} /> : <EyeOff size={15} color={colors.icon} />}</TouchableOpacity>} />
 
-            <FieldInput label="Confirm Password" value={form.confirmPassword} onChange={v => setForm({ ...form, confirmPassword: v })} placeholder="••••••••" error={errors.confirmPassword} secureTextEntry={!showConfirm} icon={<Lock size={15} color={colors.icon} />}
+            <FieldInput label={t('confirm_password')} value={form.confirmPassword} onChange={v => setForm({ ...form, confirmPassword: v })} placeholder="••••••••" error={errors.confirmPassword} secureTextEntry={!showConfirm} icon={<Lock size={15} color={colors.icon} />}
               rightIcon={<TouchableOpacity onPress={() => setShowConfirm(!showConfirm)}>{showConfirm ? <Eye size={15} color={colors.icon} /> : <EyeOff size={15} color={colors.icon} />}</TouchableOpacity>} />
 
             <View style={{ height: 20 }} />
@@ -138,11 +147,11 @@ const AddUserModal: React.FC<{
           <View style={{ flexDirection: 'row', gap: 12, padding: 24, borderTopWidth: 1, borderTopColor: colors.border, paddingBottom: Platform.OS === 'ios' ? 40 : 24 }}>
             <TouchableOpacity onPress={onClose} disabled={loading}
               style={{ flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background }}>
-              <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon }}>CANCEL</Text>
+              <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon }}>{t('cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={handleSubmit} disabled={loading}
               style={{ flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: 'center', backgroundColor: colors.tint, opacity: loading ? 0.6 : 1 }}>
-              {loading ? <ActivityIndicator size="small" color="#000" /> : <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: '#000' }}>ADD USER</Text>}
+              {loading ? <ActivityIndicator size="small" color="#000" /> : <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: '#000' }}>{t('add_user')}</Text>}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -156,6 +165,7 @@ export default function UsersScreen() {
   const { theme } = useTheme();
   const colors = Colors[theme];
   const router = useRouter();
+  const { t } = useTranslation();
 
   const [users, setUsers]                 = useState<User[]>([]);
   const [isLoading, setIsLoading]         = useState(true);
@@ -177,7 +187,7 @@ export default function UsersScreen() {
   useEffect(() => { fetchUsers(); }, []);
 
   useEffect(() => {
-    if (toast.msg) { const t = setTimeout(() => setToast({ msg: '', type: null }), 3000); return () => clearTimeout(t); }
+    if (toast.msg) { const timer = setTimeout(() => setToast({ msg: '', type: null }), 3000); return () => clearTimeout(timer); }
   }, [toast]);
 
   const handleUpdate = async () => {
@@ -185,9 +195,9 @@ export default function UsersScreen() {
     setIsSubmitting(true);
     try {
       await api.put(`/users/${editingUser._id}`, { name: editingUser.name, phone_number: editingUser.phone_number, role: editingUser.role });
-      setToast({ msg: 'User updated successfully', type: 'success' });
+      setToast({ msg: t('user_updated'), type: 'success' });
       setEditingUser(null); fetchUsers();
-    } catch { setToast({ msg: 'Update failed', type: 'error' }); }
+    } catch { setToast({ msg: t('update_failed'), type: 'error' }); }
     finally { setIsSubmitting(false); }
   };
 
@@ -197,8 +207,8 @@ export default function UsersScreen() {
     try {
       await api.delete(`/users/${confirmDelete._id}`);
       setUsers(users.filter(u => u._id !== confirmDelete._id));
-      setToast({ msg: 'User removed', type: 'success' });
-    } catch { setToast({ msg: 'Delete failed', type: 'error' }); }
+      setToast({ msg: t('user_removed'), type: 'success' });
+    } catch { setToast({ msg: t('delete_failed'), type: 'error' }); }
     finally { setConfirmDelete(null); setIsSubmitting(false); }
   };
 
@@ -208,16 +218,21 @@ export default function UsersScreen() {
   });
 
   const roleBadge = (role: string) => {
-    if (role === 'admin')  return { bg: `${colors.tint}1A`,           border: `${colors.tint}4D`,           text: colors.tint };
-    if (role === 'driver') return { bg: 'rgba(245,158,11,0.1)',        border: 'rgba(245,158,11,0.3)',        text: '#F59E0B' };
-    return                        { bg: colors.card,                   border: colors.border,                 text: colors.icon };
+    if (role === 'admin')  return { bg: `${colors.tint}1A`,        border: `${colors.tint}4D`,        text: colors.tint };
+    if (role === 'driver') return { bg: 'rgba(245,158,11,0.1)',     border: 'rgba(245,158,11,0.3)',     text: '#F59E0B' };
+    return                        { bg: colors.card,                border: colors.border,              text: colors.icon };
   };
 
-  const ROLES = [{ key: 'all', label: 'All' }, { key: 'student', label: 'Student' }, { key: 'admin', label: 'Admin' }, { key: 'driver', label: 'Driver' }] as const;
+  const ROLES = [
+    { key: 'all',     label: t('all') },
+    { key: 'student', label: t('student') },
+    { key: 'admin',   label: t('admin') },
+    { key: 'driver',  label: t('driver') },
+  ] as const;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <TopBar title="Users" showMenu showSettings onSettingsPress={() => router.push('/(admin)/settings' as any)} />
+      <TopBar title={t('nav_users')} showMenu showSettings onSettingsPress={() => router.push('/(admin)/settings' as any)} />
 
       {/* Toast */}
       {toast.msg && (
@@ -238,13 +253,13 @@ export default function UsersScreen() {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <View>
             <Text style={{ fontSize: 22, fontWeight: '900', textTransform: 'uppercase', letterSpacing: -0.5, color: colors.text }}>
-              USER{' '}<Text style={{ color: colors.tint }}>DIRECTORY</Text>
+              {t('user_directory_part1')}{' '}<Text style={{ color: colors.tint }}>{t('user_directory_part2')}</Text>
             </Text>
-            <Text style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginTop: 2 }}>MANAGE ACCOUNTS</Text>
+            <Text style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginTop: 2 }}>{t('manage_accounts')}</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <View style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1, backgroundColor: `${colors.tint}1A`, borderColor: `${colors.tint}33` }}>
-              <Text style={{ fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.tint }}>{users.length} USERS</Text>
+              <Text style={{ fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.tint }}>{users.length} {t('nav_users').toUpperCase()}</Text>
             </View>
             <TouchableOpacity
               onPress={() => setShowAddUser(true)}
@@ -258,7 +273,13 @@ export default function UsersScreen() {
         {/* Search */}
         <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, paddingHorizontal: 16, height: 52, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, marginBottom: 12, gap: 10 }}>
           <Search size={16} color={colors.icon} />
-          <TextInput style={{ flex: 1, fontSize: 13, fontWeight: '600', color: colors.text }} placeholder="Search by name, ID or email..." placeholderTextColor={colors.icon} value={searchQuery} onChangeText={setSearchQuery} />
+          <TextInput
+            style={{ flex: 1, fontSize: 13, fontWeight: '600', color: colors.text }}
+            placeholder={t('search_users_placeholder')}
+            placeholderTextColor={colors.icon}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
           {searchQuery.length > 0 && <TouchableOpacity onPress={() => setSearchQuery('')}><X size={16} color={colors.icon} /></TouchableOpacity>}
         </View>
 
@@ -266,7 +287,7 @@ export default function UsersScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {ROLES.map(({ key, label }) => (
-              <TouchableOpacity key={key} onPress={() => setSelectedRole(key)}
+              <TouchableOpacity key={key} onPress={() => setSelectedRole(key as any)}
                 style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, borderWidth: 1, backgroundColor: selectedRole === key ? colors.tint : colors.card, borderColor: selectedRole === key ? colors.tint : colors.border }}>
                 <Text style={{ fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: selectedRole === key ? '#000' : colors.icon }}>{label}</Text>
               </TouchableOpacity>
@@ -279,11 +300,11 @@ export default function UsersScreen() {
       {isLoading ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 }}>
           <ActivityIndicator size="large" color={colors.tint} />
-          <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 3, color: colors.icon }}>LOADING...</Text>
+          <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 3, color: colors.icon }}>{t('loading').toUpperCase()}</Text>
         </View>
       ) : filteredUsers.length === 0 ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, color: colors.icon }}>No records found.</Text>
+          <Text style={{ fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, color: colors.icon }}>{t('no_users_found')}</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
@@ -294,19 +315,19 @@ export default function UsersScreen() {
                 <View style={{
                   width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 14, borderWidth: 1,
                   backgroundColor: user.role === 'admin' ? `${colors.tint}1A` : colors.card,
-                  borderColor:     user.role === 'admin' ? `${colors.tint}33` : colors.border,
+                  borderColor:     user.role === 'admin' ? `${colors.tint}33`  : colors.border,
                 }}>
                   <Text style={{ fontSize: 18, fontWeight: '900', color: colors.tint }}>{user.name.charAt(0).toUpperCase()}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 3 }} numberOfLines={1}>{user.name}</Text>
                   <Text style={{ fontSize: 11, fontWeight: '500', color: colors.icon }} numberOfLines={1}>
-                    {user.student_id ? `ID: ${user.student_id}` : user.email}
+                    {user.student_id ? `${t('id_label')} ${user.student_id}` : user.email}
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end', gap: 8 }}>
                   <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, backgroundColor: badge.bg, borderColor: badge.border }}>
-                    <Text style={{ fontSize: 8, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase', color: badge.text }}>{user.role}</Text>
+                    <Text style={{ fontSize: 8, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase', color: badge.text }}>{t(user.role)}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
                     {(user.role === 'student' || user.role === 'driver') && (
@@ -329,7 +350,7 @@ export default function UsersScreen() {
       )}
 
       {/* Add User Modal */}
-      {showAddUser && <AddUserModal colors={colors} onClose={() => setShowAddUser(false)} onSuccess={fetchUsers} setToast={setToast} />}
+      {showAddUser && <AddUserModal t={t} colors={colors} onClose={() => setShowAddUser(false)} onSuccess={fetchUsers} setToast={setToast} />}
 
       {/* Edit Modal */}
       <Modal visible={!!editingUser} transparent animationType="slide">
@@ -340,9 +361,9 @@ export default function UsersScreen() {
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 24, borderBottomWidth: 1, borderBottomColor: colors.border }}>
               <View>
                 <Text style={{ fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>
-                  EDIT{' '}<Text style={{ color: colors.tint }}>USER</Text>
+                  {t('edit_user_title_part1')}{' '}<Text style={{ color: colors.tint }}>{t('edit_user_title_part2')}</Text>
                 </Text>
-                <Text style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginTop: 2 }}>UPDATE PROFILE INFO</Text>
+                <Text style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginTop: 2 }}>{t('update_profile_info')}</Text>
               </View>
               <TouchableOpacity onPress={() => setEditingUser(null)}
                 style={{ width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}>
@@ -352,23 +373,20 @@ export default function UsersScreen() {
 
             {editingUser && (
               <ScrollView style={{ padding: 24 }} showsVerticalScrollIndicator={false}>
-                {/* Full Name */}
-                <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginBottom: 8 }}>FULL NAME</Text>
+                <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginBottom: 8 }}>{t('full_name')}</Text>
                 <View style={{ borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, height: 52, justifyContent: 'center', backgroundColor: colors.background, borderColor: colors.border, marginBottom: 16 }}>
-                  <TextInput style={{ fontSize: 14, fontWeight: '700', color: colors.text }} value={editingUser.name} onChangeText={t => setEditingUser({ ...editingUser, name: t })} />
+                  <TextInput style={{ fontSize: 14, fontWeight: '700', color: colors.text }} value={editingUser.name} onChangeText={v => setEditingUser({ ...editingUser, name: v })} />
                 </View>
 
-                {/* Phone */}
-                <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginBottom: 8 }}>PHONE NUMBER</Text>
+                <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginBottom: 8 }}>{t('phone_number')}</Text>
                 <View style={{ borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, height: 52, justifyContent: 'center', backgroundColor: colors.background, borderColor: colors.border, marginBottom: 16 }}>
-                  <TextInput style={{ fontSize: 14, fontWeight: '700', color: colors.text }} value={editingUser.phone_number} onChangeText={t => setEditingUser({ ...editingUser, phone_number: t })} keyboardType="phone-pad" />
+                  <TextInput style={{ fontSize: 14, fontWeight: '700', color: colors.text }} value={editingUser.phone_number} onChangeText={v => setEditingUser({ ...editingUser, phone_number: v })} keyboardType="phone-pad" />
                 </View>
 
-                {/* Student ID (locked) */}
                 {editingUser.student_id && (
                   <>
                     <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginBottom: 8, opacity: 0.5 }}>
-                      {editingUser.role === 'driver' ? 'DRIVER ID (LOCKED)' : 'STUDENT ID (LOCKED)'}
+                      {editingUser.role === 'driver' ? t('driver_id_locked') : t('student_id_locked')}
                     </Text>
                     <View style={{ borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, height: 52, justifyContent: 'center', backgroundColor: `${colors.border}33`, borderColor: colors.border, marginBottom: 16, opacity: 0.5 }}>
                       <TextInput style={{ fontSize: 14, fontWeight: '700', color: colors.icon }} value={editingUser.student_id} editable={false} />
@@ -376,8 +394,7 @@ export default function UsersScreen() {
                   </>
                 )}
 
-                {/* System Role */}
-                <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginBottom: 8 }}>SYSTEM ROLE</Text>
+                <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginBottom: 8 }}>{t('system_role')}</Text>
                 <View style={{ flexDirection: 'row', gap: 10, marginBottom: 28 }}>
                   {(['student', 'admin', 'driver'] as const).map(role => {
                     const Icon = role === 'admin' ? Shield : role === 'driver' ? Users : UserIcon;
@@ -386,7 +403,7 @@ export default function UsersScreen() {
                       <TouchableOpacity key={role} onPress={() => setEditingUser({ ...editingUser, role })}
                         style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: active ? `${colors.tint}1A` : colors.background, borderColor: active ? colors.tint : colors.border }}>
                         <Icon size={14} color={active ? colors.tint : colors.icon} />
-                        <Text style={{ fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: active ? colors.tint : colors.icon }}>{role}</Text>
+                        <Text style={{ fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: active ? colors.tint : colors.icon }}>{t(role)}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -398,7 +415,7 @@ export default function UsersScreen() {
               <TouchableOpacity onPress={handleUpdate} disabled={isSubmitting}
                 style={{ paddingVertical: 14, borderRadius: 14, alignItems: 'center', backgroundColor: colors.tint, opacity: isSubmitting ? 0.6 : 1 }}>
                 <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: '#000' }}>
-                  {isSubmitting ? 'SAVING...' : 'SAVE CHANGES'}
+                  {isSubmitting ? t('saving') : t('save_changes')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -413,21 +430,19 @@ export default function UsersScreen() {
             <View style={{ width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 16, backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)' }}>
               <Trash2 size={28} color={colors.error || '#ef4444'} />
             </View>
-            <Text style={{ fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, color: colors.text }}>REMOVE USER</Text>
+            <Text style={{ fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, color: colors.text }}>{t('remove_user')}</Text>
             <Text style={{ fontSize: 12, textAlign: 'center', lineHeight: 20, marginBottom: 24, color: colors.icon }}>
-              Are you sure you want to delete{' '}
-              <Text style={{ fontWeight: '900', color: colors.text }}>{confirmDelete?.name}</Text>?{' '}
-              This cannot be undone.
+              {t('confirm_delete_user_message', { name: confirmDelete?.name })}
             </Text>
             <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
               <TouchableOpacity onPress={() => setConfirmDelete(null)}
                 style={{ flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}>
-                <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon }}>CANCEL</Text>
+                <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon }}>{t('cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={executeDelete} disabled={isSubmitting}
                 style={{ flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: 'center', backgroundColor: colors.error || '#ef4444', opacity: isSubmitting ? 0.6 : 1 }}>
                 <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, color: '#fff' }}>
-                  {isSubmitting ? '...' : 'DELETE'}
+                  {isSubmitting ? '...' : t('delete')}
                 </Text>
               </TouchableOpacity>
             </View>

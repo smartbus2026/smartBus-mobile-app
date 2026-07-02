@@ -9,6 +9,7 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import { isCurrentLanguageRTL } from '../i18n';
 import { useThemeColor } from '../../constants/theme';
 import { useAuth } from '../context/AuthContext';
 import { useSidebar } from '../context/SidebarContext2';
@@ -67,13 +68,14 @@ function NavItem({
 }) {
   const { Icon } = item;
   const { t }    = useTranslation();
+  const isRTL    = isCurrentLanguageRTL();
   return (
     <TouchableOpacity
       style={[s.navItem, { backgroundColor: active ? `${colors.tint}1A` : 'transparent' }]}
       onPress={onPress}
       activeOpacity={0.75}
     >
-      {active && <View style={[s.accentBar, { backgroundColor: colors.tint }]} />}
+      {active && <View style={[s.accentBar, { backgroundColor: colors.tint }, isRTL ? { right: 0 } : { left: 0 }]} />}
       <Icon size={18} color={active ? colors.tint : colors.icon} strokeWidth={active ? 2.5 : 2} />
       <Text style={[s.navLabel, { color: active ? colors.tint : colors.icon }, active && s.navLabelActive]}>
         {t(item.labelKey)}
@@ -93,6 +95,7 @@ export default function Sidebar({ role }: SidebarProps) {
   const { isOpen, closeSidebar } = useSidebar();
   const { logout } = useAuth();
   const { t }      = useTranslation();
+  const isRTL      = isCurrentLanguageRTL();
 
   const NAV        = role === 'admin' ? ADMIN_NAV    : role === 'driver' ? DRIVER_NAV    : STUDENT_NAV;
   const BOTTOM_NAV = role === 'admin' ? ADMIN_BOTTOM : role === 'driver' ? DRIVER_BOTTOM : STUDENT_BOTTOM;
@@ -118,7 +121,13 @@ export default function Sidebar({ role }: SidebarProps) {
 
       <SafeAreaView
         edges={['top', 'bottom']}
-        style={[s.drawer, { backgroundColor: colors.card, borderRightColor: colors.border }]}
+        style={[
+          s.drawer,
+          { backgroundColor: colors.card },
+          isRTL
+            ? { right: 0, borderLeftWidth: 1, borderLeftColor: colors.border, shadowOffset: { width: -4, height: 0 } }
+            : { left: 0, borderRightWidth: 1, borderRightColor: colors.border, shadowOffset: { width: 4, height: 0 } }
+        ]}
       >
         {/* Logo */}
         <View style={[s.logoRow, { borderBottomColor: colors.border }]}>
@@ -161,11 +170,9 @@ const s = StyleSheet.create({
   },
   drawer: {
     position: 'absolute',
-    top: 0, bottom: 0, left: 0,
+    top: 0, bottom: 0,
     width: 272,
-    borderRightWidth: 1,
     shadowColor: '#000',
-    shadowOffset: { width: 4, height: 0 },
     shadowOpacity: 0.18,
     shadowRadius: 20,
     elevation: 20,
@@ -189,7 +196,7 @@ const s = StyleSheet.create({
     borderRadius: 16, marginBottom: 2,
     position: 'relative', overflow: 'hidden',
   },
-  accentBar:     { position: 'absolute', left: 0, width: 3, height: 20, borderRadius: 2 },
+  accentBar:     { position: 'absolute', width: 3, height: 20, borderRadius: 2 },
   navLabel:      { fontSize: 13, fontWeight: '700', letterSpacing: 0.2 },
   navLabelActive:{ fontWeight: '800' },
   bottomSection: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 8, borderTopWidth: 1, gap: 2 },

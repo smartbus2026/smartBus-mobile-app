@@ -9,6 +9,7 @@ import {
 import { DrawerContentScrollView } from "@react-navigation/drawer";
 import { router, usePathname } from "expo-router";
 import { useTranslation } from "react-i18next";
+import { isCurrentLanguageRTL } from "../../src/i18n";
 import { useAuth } from "../../src/context/AuthContext";
 import { useThemeColor } from "../../constants/theme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -29,6 +30,7 @@ function DriverDrawerContent(props: any) {
   const insets     = useSafeAreaInsets();
   const { t }      = useTranslation();
   const current    = props.state?.routeNames[props.state?.index];
+  const isRTL      = isCurrentLanguageRTL();
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.card }}>
@@ -69,7 +71,7 @@ function DriverDrawerContent(props: any) {
               >
                 <Icon size={18} color={isActive ? colors.tint : colors.icon} />
                 <Text style={{ fontSize: 13, fontWeight: "700", color: isActive ? colors.tint : colors.icon }}>{t(item.labelKey)}</Text>
-                {isActive && <View style={{ position: "absolute", left: 0, width: 3, height: 20, borderRadius: 2, backgroundColor: colors.tint }} />}
+                {isActive && <View style={[{ position: "absolute", width: 3, height: 20, borderRadius: 2, backgroundColor: colors.tint }, isRTL ? { right: 0 } : { left: 0 }]} />}
               </TouchableOpacity>
             );
           })}

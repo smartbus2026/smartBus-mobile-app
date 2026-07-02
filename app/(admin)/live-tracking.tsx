@@ -13,6 +13,7 @@ import MapView, { Callout, Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { io, Socket } from "socket.io-client";
 import { useThemeColor } from "../../constants/theme";
 import TopBar from "../../src/components/TopBar";
+import { isCurrentLanguageRTL } from "../../src/i18n";
 import api from "../../src/services/api";
 const BACKEND_URL = 'http://192.168.1.11:5001'; // نفس IP الـ backend
 
@@ -212,6 +213,7 @@ const TripCard: React.FC<{
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function LiveTrackingScreen() {
   const colors  = useThemeColor();
+  const isRTL   = isCurrentLanguageRTL();
   const router  = useRouter();
   const mapRef  = useRef<MapView>(null);
 
@@ -418,12 +420,12 @@ export default function LiveTrackingScreen() {
               </MapView>
 
               {/* Fleet Count Badge */}
-              <View style={{
-                position: 'absolute', top: 16, left: 16, zIndex: 10,
+              <View style={[{
+                position: 'absolute', top: 16, zIndex: 10,
                 flexDirection: 'row', alignItems: 'center', gap: 8,
                 paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14,
                 backgroundColor: `${colors.card}E6`, borderWidth: 1, borderColor: colors.border,
-              }}>
+              }, isRTL ? { right: 16 } : { left: 16 }]}>
                 <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.tint }} />
                 <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>
                   {tripsWithLocations.length} Active {tripsWithLocations.length === 1 ? 'Bus' : 'Buses'}

@@ -11,6 +11,7 @@ import {
   Route as RouteIcon, Trash2, X,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Colors } from '../../constants/theme';
 import { useTheme } from '../../src/context/ThemeContext';
 import api from '../../src/services/api';
@@ -30,6 +31,7 @@ export default function ManageRoutesScreen() {
   const { theme } = useTheme();
   const colors = Colors[theme];
   const router = useRouter();
+  const { t } = useTranslation();
 
   const [routes, setRoutes]               = useState<any[]>([]);
   const [isLoading, setIsLoading]         = useState(true);
@@ -50,8 +52,8 @@ export default function ManageRoutesScreen() {
 
   useEffect(() => {
     if (toast.msg) {
-      const t = setTimeout(() => setToast({ msg: '', type: null }), 3000);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => setToast({ msg: '', type: null }), 3000);
+      return () => clearTimeout(timer);
     }
   }, [toast]);
 
@@ -65,15 +67,15 @@ export default function ManageRoutesScreen() {
   };
 
   const handleDeploy = async () => {
-    if (!form.name.trim() || form.stops.some(s => !s.trim())) { setToast({ msg: 'Please fill all required fields', type: 'error' }); return; }
+    if (!form.name.trim() || form.stops.some(s => !s.trim())) { setToast({ msg: t('fill_required'), type: 'error' }); return; }
     setIsDeploying(true);
     try {
       await api.post('/routes', { ...form, startLocation: { lat: form.startLocation.latitude, lng: form.startLocation.longitude } });
       await fetchRoutes();
       setIsModalOpen(false);
       setForm({ name: '', distance: '', duration: '', startTime: '07:30', startLocation: { latitude: ASWAN_CENTER.latitude, longitude: ASWAN_CENTER.longitude }, stops: [''] });
-      setToast({ msg: 'Route deployed successfully', type: 'success' });
-    } catch { setToast({ msg: 'Deployment failed', type: 'error' }); }
+      setToast({ msg: t('route_deployed'), type: 'success' });
+    } catch { setToast({ msg: t('deployment_failed'), type: 'error' }); }
     finally { setIsDeploying(false); }
   };
 
@@ -83,13 +85,13 @@ export default function ManageRoutesScreen() {
       if (confirmDelete.type === 'route') {
         await api.delete(`/routes/${confirmDelete.routeId}`);
         setRoutes(prev => prev.filter(r => r._id !== confirmDelete.routeId));
-        setToast({ msg: 'Route deleted', type: 'success' });
+        setToast({ msg: t('route_deleted'), type: 'success' });
       } else {
         await api.delete(`/routes/${confirmDelete.routeId}/remove-stop/${confirmDelete.stopId}`);
         await fetchRoutes();
-        setToast({ msg: 'Stop removed', type: 'success' });
+        setToast({ msg: t('stop_removed', { name: confirmDelete.stopName }), type: 'success' });
       }
-    } catch { setToast({ msg: 'Delete failed', type: 'error' }); }
+    } catch { setToast({ msg: t('delete_failed'), type: 'error' }); }
     finally { setConfirmDelete(null); }
   };
 
@@ -99,15 +101,15 @@ export default function ManageRoutesScreen() {
       await api.post(`/routes/${routeId}/stops`, { stop_name: newStopName, lat: 0, lng: 0 });
       await fetchRoutes();
       setNewStopName(''); setQuickAddId(null);
-      setToast({ msg: 'Stop added', type: 'success' });
-    } catch { setToast({ msg: 'Failed to add stop', type: 'error' }); }
+      setToast({ msg: t('stop_added'), type: 'success' });
+    } catch { setToast({ msg: t('failed_add_stop'), type: 'error' }); }
   };
 
   const toggleExpand = (id: string) => setExpandedRouteId(expandedRouteId === id ? null : id);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <TopBar title="Routes" showMenu showSettings onSettingsPress={() => router.push('/(admin)/settings' as any)} />
+      <TopBar title={t('nav_manageRoutes')} showMenu showSettings onSettingsPress={() => router.push('/(admin)/settings' as any)} />
 
       {/* Toast */}
       {toast.msg && (
@@ -127,10 +129,10 @@ export default function ManageRoutesScreen() {
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 }}>
         <View>
           <Text style={{ fontSize: 22, fontWeight: '900', textTransform: 'uppercase', letterSpacing: -0.5, color: colors.text }}>
-            NETWORK{' '}<Text style={{ color: colors.tint }}>ROUTES</Text>
+            {t('network_routes_part1')}{' '}<Text style={{ color: colors.tint }}>{t('network_routes_part2')}</Text>
           </Text>
           <Text style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, color: colors.icon, marginTop: 2 }}>
-            MANAGE OPERATING SECTORS
+            {t('manage_operating_sectors')}
           </Text>
         </View>
         <TouchableOpacity
@@ -148,21 +150,21 @@ export default function ManageRoutesScreen() {
       {isLoading ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 }}>
           <ActivityIndicator size="large" color={colors.tint} />
-          <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 3, color: colors.icon }}>LOADING...</Text>
+          <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 3, color: colors.icon }}>{t('loading').toUpperCase()}</Text>
         </View>
       ) : routes.length === 0 ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 }}>
           <View style={{ width: 72, height: 72, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: `${colors.tint}1A`, borderWidth: 1, borderColor: `${colors.tint}33` }}>
             <RouteIcon size={32} color={colors.tint} />
           </View>
-          <Text style={{ fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, color: colors.icon }}>No routes mapped yet.</Text>
+          <Text style={{ fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, color: colors.icon }}>{t('no_routes_mapped')}</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
           {routes.map(route => {
             const isExpanded = expandedRouteId === route._id;
-            const startStop  = route.stops?.[0]?.name || route.stops?.[0] || 'Start';
-            const endStop    = route.stops?.[route.stops?.length - 1]?.name || route.stops?.[route.stops?.length - 1] || 'End';
+            const startStop  = route.stops?.[0]?.name || route.stops?.[0] || t('stop_start');
+            const endStop    = route.stops?.[route.stops?.length - 1]?.name || route.stops?.[route.stops?.length - 1] || t('stop_end');
 
             return (
               <View key={route._id} style={{
@@ -170,7 +172,6 @@ export default function ManageRoutesScreen() {
                 backgroundColor: colors.card,
                 borderColor: isExpanded ? `${colors.tint}4D` : colors.border,
               }}>
-                {/* Card Header */}
                 <TouchableOpacity
                   style={{ flexDirection: 'row', alignItems: 'center', padding: 20 }}
                   onPress={() => toggleExpand(route._id)} activeOpacity={0.7}
@@ -192,12 +193,11 @@ export default function ManageRoutesScreen() {
                   {isExpanded ? <ChevronUp size={20} color={colors.icon} /> : <ChevronDown size={20} color={colors.icon} />}
                 </TouchableOpacity>
 
-                {/* Expanded */}
                 {isExpanded && (
                   <View style={{ borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.background }}>
                     <View style={{ padding: 20 }}>
                       <Text style={{ fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 16, color: colors.icon }}>
-                        STATIONS TIMELINE
+                        {t('stations_timeline')}
                       </Text>
 
                       {route.stops?.map((stop: any, i: number) => {
@@ -228,17 +228,24 @@ export default function ManageRoutesScreen() {
                             <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.tint }} />
                           </View>
                           <View style={{ flex: 1, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, height: 40, justifyContent: 'center', backgroundColor: colors.background, borderColor: colors.tint }}>
-                            <TextInput style={{ fontSize: 11, fontWeight: '700', color: colors.text }} placeholder="NEW STATION..." placeholderTextColor={colors.icon} value={newStopName} onChangeText={setNewStopName} autoFocus />
+                            <TextInput
+                              style={{ fontSize: 11, fontWeight: '700', color: colors.text }}
+                              placeholder={t('new_station_placeholder')}
+                              placeholderTextColor={colors.icon}
+                              value={newStopName}
+                              onChangeText={setNewStopName}
+                              autoFocus
+                            />
                           </View>
                           <TouchableOpacity onPress={() => handleQuickAddStop(route._id)}
                             style={{ borderRadius: 12, paddingHorizontal: 14, height: 40, justifyContent: 'center', marginLeft: 8, backgroundColor: colors.tint }}>
-                            <Text style={{ fontSize: 10, fontWeight: '900', textTransform: 'uppercase', color: '#000' }}>ADD</Text>
+                            <Text style={{ fontSize: 10, fontWeight: '900', textTransform: 'uppercase', color: '#000' }}>{t('add_btn')}</Text>
                           </TouchableOpacity>
                         </View>
                       ) : (
                         <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingLeft: 30 }} onPress={() => setQuickAddId(route._id)}>
                           <Plus size={14} color={colors.tint} />
-                          <Text style={{ fontSize: 10, fontWeight: '900', letterSpacing: 2, textTransform: 'uppercase', color: colors.tint }}>ADD STATION</Text>
+                          <Text style={{ fontSize: 10, fontWeight: '900', letterSpacing: 2, textTransform: 'uppercase', color: colors.tint }}>{t('add_stop_link').toUpperCase()}</Text>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -253,7 +260,7 @@ export default function ManageRoutesScreen() {
                         }}
                       >
                         <Trash2 size={14} color="#ef4444" />
-                        <Text style={{ fontSize: 10, fontWeight: '900', letterSpacing: 2, textTransform: 'uppercase', color: '#ef4444' }}>DELETE ENTIRE ROUTE</Text>
+                        <Text style={{ fontSize: 10, fontWeight: '900', letterSpacing: 2, textTransform: 'uppercase', color: '#ef4444' }}>{t('delete_entire_route')}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -298,38 +305,50 @@ export default function ManageRoutesScreen() {
           >
             <View style={{ width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 20, backgroundColor: colors.border }} />
             <Text style={{ fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, paddingHorizontal: 24, marginBottom: 16, color: colors.text }}>
-              NEW ROUTE{' '}<Text style={{ color: colors.tint }}>SECTOR</Text>
+              {t('new_route_sector_part1')}{' '}<Text style={{ color: colors.tint }}>{t('new_route_sector_part2')}</Text>
             </Text>
 
             <ScrollView style={{ paddingHorizontal: 24 }} showsVerticalScrollIndicator={false}>
-              <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 8, color: colors.icon }}>ROUTE DESIGNATION</Text>
+              <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 8, color: colors.icon }}>{t('route_designation')}</Text>
               <View style={{ borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, height: 52, justifyContent: 'center', backgroundColor: colors.background, borderColor: colors.border, marginBottom: 16 }}>
-                <TextInput style={{ fontSize: 14, fontWeight: '700', color: colors.text }} placeholder="e.g. Aswan Univ. Route" placeholderTextColor={colors.icon} value={form.name} onChangeText={t => setForm({ ...form, name: t })} />
+                <TextInput
+                  style={{ fontSize: 14, fontWeight: '700', color: colors.text }}
+                  placeholder={t('route_name_placeholder')}
+                  placeholderTextColor={colors.icon}
+                  value={form.name}
+                  onChangeText={v => setForm({ ...form, name: v })}
+                />
               </View>
 
               <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 8, color: colors.icon }}>START TIME</Text>
+                  <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 8, color: colors.icon }}>{t('time')}</Text>
                   <View style={{ borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, height: 52, justifyContent: 'center', backgroundColor: colors.background, borderColor: colors.border }}>
-                    <TextInput style={{ fontSize: 14, fontWeight: '700', color: colors.text }} value={form.startTime} onChangeText={t => setForm({ ...form, startTime: t })} />
+                    <TextInput style={{ fontSize: 14, fontWeight: '700', color: colors.text }} value={form.startTime} onChangeText={v => setForm({ ...form, startTime: v })} />
                   </View>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 8, color: colors.icon }}>DISTANCE (KM)</Text>
+                  <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 8, color: colors.icon }}>{t('distance_km')}</Text>
                   <View style={{ borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, height: 52, justifyContent: 'center', backgroundColor: colors.background, borderColor: colors.border }}>
-                    <TextInput style={{ fontSize: 14, fontWeight: '700', color: colors.text }} keyboardType="numeric" value={form.distance} onChangeText={t => setForm({ ...form, distance: t })} />
+                    <TextInput style={{ fontSize: 14, fontWeight: '700', color: colors.text }} keyboardType="numeric" value={form.distance} onChangeText={v => setForm({ ...form, distance: v })} />
                   </View>
                 </View>
               </View>
 
-              <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 12, color: colors.icon }}>STATIONS SEQUENCE</Text>
+              <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 12, color: colors.icon }}>{t('stations_sequence')}</Text>
               {form.stops.map((stop, i) => (
                 <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
                   <View style={{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: `${colors.tint}1A`, borderWidth: 1, borderColor: `${colors.tint}33` }}>
                     <Text style={{ fontSize: 10, fontWeight: '900', color: colors.tint }}>{i + 1}</Text>
                   </View>
                   <View style={{ flex: 1, borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, height: 52, justifyContent: 'center', backgroundColor: colors.background, borderColor: colors.border }}>
-                    <TextInput style={{ fontSize: 14, fontWeight: '700', color: colors.text }} placeholder="Station Name" placeholderTextColor={colors.icon} value={stop} onChangeText={val => { const ns = [...form.stops]; ns[i] = val; setForm({ ...form, stops: ns }); }} />
+                    <TextInput
+                      style={{ fontSize: 14, fontWeight: '700', color: colors.text }}
+                      placeholder={t('station_name_placeholder')}
+                      placeholderTextColor={colors.icon}
+                      value={stop}
+                      onChangeText={val => { const ns = [...form.stops]; ns[i] = val; setForm({ ...form, stops: ns }); }}
+                    />
                   </View>
                 </View>
               ))}
@@ -337,13 +356,13 @@ export default function ManageRoutesScreen() {
               <TouchableOpacity onPress={() => setForm({ ...form, stops: [...form.stops, ''] })}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginTop: 4, marginBottom: 24, paddingVertical: 8 }}>
                 <Plus size={14} color={colors.tint} />
-                <Text style={{ fontSize: 10, fontWeight: '900', letterSpacing: 2, textTransform: 'uppercase', color: colors.tint }}>ADD STATION</Text>
+                <Text style={{ fontSize: 10, fontWeight: '900', letterSpacing: 2, textTransform: 'uppercase', color: colors.tint }}>{t('add_stop_link').toUpperCase()}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity onPress={handleDeploy} disabled={isDeploying} activeOpacity={0.85}
                 style={{ paddingVertical: 16, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tint, opacity: isDeploying ? 0.7 : 1, marginBottom: 40 }}>
                 <Text style={{ fontSize: 12, fontWeight: '900', letterSpacing: 2, textTransform: 'uppercase', color: '#000' }}>
-                  {isDeploying ? 'PROCESSING...' : 'DEPLOY TO NETWORK'}
+                  {isDeploying ? t('processing') : t('deploy_route')}
                 </Text>
               </TouchableOpacity>
             </ScrollView>
@@ -358,18 +377,20 @@ export default function ManageRoutesScreen() {
             <View style={{ width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 16, backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)' }}>
               <Trash2 size={28} color="#ef4444" />
             </View>
-            <Text style={{ fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, color: colors.text }}>CONFIRM ACTION</Text>
+            <Text style={{ fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, color: colors.text }}>{t('confirm_delete')}</Text>
             <Text style={{ fontSize: 12, textAlign: 'center', lineHeight: 20, marginBottom: 24, color: colors.icon }}>
-              {confirmDelete?.type === 'route' ? 'Delete this route completely?' : `Remove station "${confirmDelete?.stopName}"?`}
+              {confirmDelete?.type === 'route'
+                ? t('delete_route_confirm')
+                : t('remove_stop_confirm', { name: confirmDelete?.stopName })}
             </Text>
             <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
               <TouchableOpacity onPress={() => setConfirmDelete(null)}
                 style={{ flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center', backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}>
-                <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>CANCEL</Text>
+                <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: colors.text }}>{t('cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={executeDelete}
                 style={{ flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center', backgroundColor: '#ef4444' }}>
-                <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: '#fff' }}>DELETE</Text>
+                <Text style={{ fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, color: '#fff' }}>{t('delete')}</Text>
               </TouchableOpacity>
             </View>
           </View>

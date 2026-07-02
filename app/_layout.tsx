@@ -5,8 +5,8 @@ import { I18nextProvider } from 'react-i18next';
 import { ActivityIndicator, View } from 'react-native';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { ThemeProvider } from '../src/context/ThemeContext';
-import '../src/i18n';
-import i18n from '../src/i18n';
+import '../src/i18n/index';
+import i18n from '../src/i18n/index';
 
 function RootGuard() {
   const { token, userRole, isLoading } = useAuth();
